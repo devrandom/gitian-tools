@@ -1,0 +1,40 @@
+#!/usr/bin/python
+
+'''Gitian package creator'''
+
+import os
+import sys
+
+USAGE = """USAGE: %s name repos-url repos-commit
+"""%(sys.argv[0])
+if __name__ == "__main__":
+  if len(sys.argv) != 4:
+    print >> sys.stderr, USAGE
+    exit(1)
+
+  name = sys.argv[1]
+  url = sys.argv[2]
+  commit = sys.argv[3]
+
+  if os.access(name, os.F_OK):
+    print >> sys.stderr, "already exists"
+    exit(1)
+
+  os.makedirs(name)
+  f = open(os.path.join(name, name + ".gdsc"), "w")
+  f.write("""--- 
+name: "%s"
+packager: rubygems
+packager_options:
+  rake_cmd: "rake gem"
+""" % (name))
+  f.close()
+
+  f = open(os.path.join(name, name + ".vcptr"), "w")
+  f.write("""---
+url: "%s"
+commit: %s
+""" % (url, commit))
+  f.close()
+
+  print "created %s" %(name)

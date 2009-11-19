@@ -1,0 +1,7 @@
+Debian dependencies:
+  python-git
+  python-yaml
+
+If you have gems:
+  rubygems
+  builder gem (used by gem generate_index)

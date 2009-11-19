@@ -1,0 +1,44 @@
+#!/usr/bin/python
+
+'''Gitian release'''
+
+import sys
+import os
+import yaml
+import fnmatch
+import glob
+import shutil
+from optparse import OptionParser
+#from gettext import gettext as _
+
+if __name__ == "__main__":
+  parser = OptionParser()
+  parser.add_option ("-c", "--clean", default=False, action="store_true",
+      dest="clean",
+      help="Clean dist directory first")
+  parser.add_option ("-n", "--dry-run", default=False, action="store_true",
+      dest="dryrun",
+      help="Do not actually build anything, but still generate release index")
+
+  (options, args) = parser.parse_args()
+  if not os.access("gitian-repos", os.F_OK):
+    print >> sys.stderr, "must be run within the gitian repository"
+    exit(1)
+  
+  if options.clean and os.access('dist', os.F_OK):
+    shutil.rmtree('dist')
+  
+  for dsc in glob.glob('packages/*/*.gdsc'):
+    if options.dryrun:
+      print dsc
+      continue
+    res = os.system("gitian-builder --dest %s %s"% ('dist', dsc))
+    if res != 0:
+      print >> sys.stderr, "build failed for %s"% (dsc)
+      sys.exit(1)
+
+  if (os.access('dist/rubygems', os.F_OK)):
+    res = os.system("gem generate_index --directory dist/rubygems")
+    if res != 0:
+      print >> sys.stderr, "gem generate_index failed"
+      sys.exit(1)
