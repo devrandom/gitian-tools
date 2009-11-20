@@ -1,0 +1,36 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'rubygems/package'
+
+file = $*[0]
+outfile = $*[1]
+
+unless file && outfile
+  $stderr.puts "must specify input and output files"
+  exit(1)
+end
+
+key = $*[2] || "cert/gem-private_key.pem"
+chain = $*[3] || "cert/gem-public_cert.pem"
+
+signer = Gem::Security::Signer.new key, chain.split(',')
+
+File.open(outfile, "wb") do |out_f|
+  File.open(file, "rb") do |in_f|
+    Gem::Package.open(out_f, "w", signer) do |out_pkg|
+      Gem::Package.open(in_f, "r") do |in_pkg|
+	spec = in_pkg.metadata
+	spec.cert_chain = signer.cert_chain.map { |cert| cert.to_s }
+	out_pkg.metadata = spec.to_yaml
+	puts spec.cert_chain
+	in_pkg.each do |entry|
+	  out_pkg.add_file_simple entry.full_name, entry.header.mode, entry.header.size do |tar_io|
+	    content = open(file, "rb") { |f| entry.read }
+	    tar_io.write content unless content.nil?
+	  end
+	end
+      end
+    end
+  end
+end
