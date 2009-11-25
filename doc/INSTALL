@@ -1,7 +1,6 @@
 Debian dependencies:
-  python-git
-  python-yaml
+  apt-get install python-git python-yaml
 
-If you have gems:
+If you have gems to distribute:
   rubygems
-  builder gem (used by gem generate_index)
+  gem install builder # used by 'gem generate_index'

@@ -1,0 +1,58 @@
+require 'rubygems'
+require 'rake'
+
+begin
+  require 'jeweler'
+  Jeweler::Tasks.new do |gem|
+    gem.name = "gitian"
+    gem.summary = "Use Gitian repository as gem source"
+    gem.description = "Add gitian sub-commands to the gem command"
+    gem.email = "info.deb@nginz.org"
+    gem.homepage = "http://github.com/devrandom/gitian"
+    gem.authors = ["Miron Cuperman"]
+    gem.files = FileList["lib/rubygems_plugin.rb", "lib/commands/*"]
+    gem.test_files = FileList["spec/*.rb", "spec/commands/*"]
+    gem.executables = []
+    gem.add_development_dependency "rspec", ">= 1.2.0"
+    gem.required_rubygems_version = Gem::Requirement.new(">= 1.3.5") if gem.respond_to? :required_rubygems_version=
+    gem.post_install_message = <<MESSAGE
+
+========================================================================
+
+           Thanks for installing Gitian! You can now run:
+
+    gem gitian        use Gitian.org or another distribution as your main gem source
+
+========================================================================
+
+MESSAGE
+  end
+  Jeweler::RubyforgeTasks.new
+rescue LoadError
+  puts "Jeweler (or a dependency) not available. Install it with: gem install jeweler"
+end
+
+require 'spec/rake/spectask'
+Spec::Rake::SpecTask.new(:spec) do |spec|
+    spec.libs << 'lib' << 'spec'
+      spec.spec_files = FileList['spec/**/*_spec.rb']
+end
+
+task :gem => :build
+
+task :default => :spec
+
+task :spec => :check_dependencies
+
+desc "release with no version change"
+task :dist => [:clean, :release]
+
+namespace :dist do
+  desc "release patch"
+  task :patch => [:clean, "version:bump:patch", :release]
+  desc "release with minor version bump"
+  task :minor => [:clean, "version:bump:minor", :release]
+end
+
+task :clean do
+end

@@ -1,0 +1,17 @@
+#!/usr/bin/ruby
+
+$:.unshift File.expand_path(File.join(File.dirname(__FILE__), "../lib"))
+
+require 'rubygems'
+require 'rubygems/gem_runner'
+require 'rubygems/exceptions'
+
+args = ARGV.clone
+
+begin
+  Gem::GemRunner.new.run args
+rescue Gem::SystemExitException => e
+  exit e.exit_code
+end
+
+
