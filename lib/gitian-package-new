@@ -5,8 +5,9 @@
 import os
 import sys
 
-USAGE = """USAGE: %s name repos-url repos-commit
-"""%(sys.argv[0])
+USAGE = """Usage: gitian package-new NAME REPOS-URL REPOS-COMMIT
+  Creates a new package within a Gitian repository
+"""
 if __name__ == "__main__":
   if len(sys.argv) != 4:
     print >> sys.stderr, USAGE

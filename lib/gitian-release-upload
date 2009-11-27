@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-'''Gitian push'''
+'''Gitian release upload'''
 
 import sys
 import os
@@ -14,6 +14,7 @@ from optparse import OptionParser
 
 if __name__ == "__main__":
   parser = OptionParser()
+  parser.prog = "gitian release-upload"
   parser.add_option ("-u", "--url",
       dest="url",
       help="Target rsync URL, or previously used URL if omitted")
@@ -38,6 +39,12 @@ if __name__ == "__main__":
   if len(args) != 1:
       parser.error("must supply command")
 
+  cmd = args[0]
+
+  if cmd == "help":
+      parser.print_help()
+      exit(1)
+
   if not os.access("gitian-repos", os.F_OK):
     print >> sys.stderr, "must be run within the gitian repository"
     exit(1)
@@ -45,8 +52,6 @@ if __name__ == "__main__":
   if not os.access("dist/rubygems/gems", os.F_OK):
     print >> sys.stderr, "dist/rubygems/gems directory does not exist"
     exit(1)
-
-  cmd = args[0]
 
   try:
       rc_f = open(".gitianrc")
@@ -115,5 +120,7 @@ if __name__ == "__main__":
 
   elif cmd == "list":
       os.system("rsync --dirs %s/"%(url))
+  elif cmd == "help":
+      parser.help()
   else:
       parser.error("unknown command")

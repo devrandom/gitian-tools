@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-'''Gitian builder'''
+'''Gitian package builder'''
 
 import sys
 import os
@@ -13,6 +13,7 @@ from optparse import OptionParser
 
 if __name__ == "__main__":
   parser = OptionParser()
+  parser.prog = "gitian package-build"
   parser.add_option ("-d", "--dest",
       dest="dest",
       help="Destination directory")

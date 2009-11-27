@@ -1,0 +1,49 @@
+#!/usr/bin/python
+
+import subprocess
+import sys
+import os
+
+def find_command(command):
+    if commands.get(command) is None:
+        print>>sys.stderr, "usage: %s CMD\ntry: %s help"%(prog, prog)
+        exit(1)
+    command = "gitian-" + command
+    for dir in [os.path.join(progdir, "../lib"), "/usr/lib/gitian"]:
+        if os.access(os.path.join(dir, command), os.F_OK):
+            found_dir = dir
+            break
+    if found_dir is None:
+        print>>sys.stderr, "installation problem - could not find subcommand"
+        exit(1)
+    return os.path.join(found_dir, command)
+
+args = sys.argv
+prog = args.pop(0)
+progdir = os.path.dirname(prog)
+
+if len(args) < 1:
+    print>>sys.stderr, "usage: %s CMD\n\ntry:\n  %s help\nor:\n  %s help CMD"%(prog, prog, prog)
+    exit(1)
+
+commands = {
+    "release-build": "Build all packages into the 'dist' directory",
+    "package-build": "Build a single package into the 'dist' directory",
+    "package-new": "Insert a new package into the distribution",
+    "release-upload": "Upload a release to a web server",
+}
+if args[0] == "help":
+    if len(args) == 1:
+        for command in commands.keys():
+            print command, " - ", commands[command]
+    else:
+        command = args[1]
+        command_path = find_command(command)
+        ret = subprocess.call([command_path, "-h"])
+else:
+    command = args.pop(0)
+    command_path = find_command(command)
+    args.insert(0, command_path)
+    ret = subprocess.call(args)
+    exit(ret)
+

@@ -1,0 +1,12 @@
+Source: gitian
+Section: misc
+Priority: extra
+Maintainer: Miron Cuperman <info.deb@nginz.org>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.1
+Homepage: https://gitian.org/
+
+Package: gitian
+Architecture: all
+Depends: ${misc:Depends}, git-core, python-yaml, python-git
+Description: Gitian distribution tools

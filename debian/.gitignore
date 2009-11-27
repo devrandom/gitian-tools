@@ -1,0 +1,5 @@
+nginz-admin
+*.log
+*.substvars
+files
+gitian
