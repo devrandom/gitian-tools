@@ -61,6 +61,12 @@ binary-indep: install
 	$(install_dir) $(CURDIR)/debian/gitian/usr/bin
 	$(install_file) bin/gitian $(CURDIR)/debian/gitian/usr/bin
 	
+	$(install_dir) $(CURDIR)/debian/gitian/usr/share/zsh/functions/Completion/Unix/
+	$(install_file) share/completion/zsh/_gitian $(CURDIR)/debian/gitian/usr/share/zsh/functions/Completion/Unix/
+
+	$(install_dir) $(CURDIR)/debian/gitian/etc/bash_completion.d
+	$(install_file) share/completion/bash/gitian $(CURDIR)/debian/gitian/etc/bash_completion.d
+	
 	dh_installchangelogs 
 	dh_installdocs
 	dh_installexamples

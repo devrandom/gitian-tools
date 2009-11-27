@@ -8,15 +8,17 @@ import git
 import yaml
 import fnmatch
 import shutil
+import gitian_shell_complete
 from optparse import OptionParser
 #from gettext import gettext as _
 
 if __name__ == "__main__":
   parser = OptionParser()
   parser.prog = "gitian package-build"
+  gitian_shell_complete.apply(parser)
   parser.add_option ("-d", "--dest",
       dest="dest",
-      help="Destination directory")
+      help="Destination directory (default ROOT/dist)")
   (options, args) = parser.parse_args()
   if not args:
     parser.error("must supply .gdsc file")

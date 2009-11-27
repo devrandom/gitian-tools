@@ -8,12 +8,14 @@ import yaml
 import fnmatch
 import glob
 import shutil
+import gitian_shell_complete
 from optparse import OptionParser
 #from gettext import gettext as _
 
 if __name__ == "__main__":
   parser = OptionParser()
   parser.prog = "gitian release-build"
+  gitian_shell_complete.apply(parser)
   parser.add_option ("-c", "--clean", default=False, action="store_true",
       dest="clean",
       help="Clean dist directory first")

@@ -40,6 +40,14 @@ if args[0] == "help":
         command = args[1]
         command_path = find_command(command)
         ret = subprocess.call([command_path, "-h"])
+elif args[0] == 'shell-complete':
+    if len(args) == 1 or args[1] == "help":
+        for command in commands.keys():
+            print "%s:%s"%(command, commands[command])
+    else:
+        command = args[1]
+        command_path = find_command(command)
+        ret = subprocess.call([command_path, "--shell-complete"])
 else:
     command = args.pop(0)
     command_path = find_command(command)

@@ -4,18 +4,25 @@
 
 import os
 import sys
+import gitian_shell_complete
+from optparse import OptionParser
 
 USAGE = """Usage: gitian package-new NAME REPOS-URL REPOS-COMMIT
   Creates a new package within a Gitian repository
 """
 if __name__ == "__main__":
-  if len(sys.argv) != 4:
+  parser = OptionParser()
+  parser.prog = "gitian package-build"
+  gitian_shell_complete.apply(parser)
+  (options, args) = parser.parse_args()
+
+  if len(args) != 3:
     print >> sys.stderr, USAGE
     exit(1)
 
-  name = sys.argv[1]
-  url = sys.argv[2]
-  commit = sys.argv[3]
+  name = args[0]
+  url = args[1]
+  commit = args[2]
 
   if os.access(name, os.F_OK):
     print >> sys.stderr, "already exists"

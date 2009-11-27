@@ -1,0 +1,33 @@
+#compdef gitian
+
+# gitian is git-oriented software distribution system
+
+local curcontext="$curcontext" state line expl cmd args ret=1
+typeset -A opt_args
+
+_arguments -C \
+    '1: :->cmd' \
+    '*:: :->args' && ret=0
+
+if (( ! $+_gitian_cmds )); then
+    typeset -gH _gitian_cmds
+    _gitian_cmds=(${(f)"$(_call_program gitian gitian shell-complete)"})
+fi
+
+if [[ $state != 'args' ]]; then
+    _describe -t subcommand 'subcommand' _gitian_cmds
+    return 0
+fi
+
+cmd="$words[1]"
+
+if [[ $cmd == 'help' ]]; then
+    _describe -t subcommand 'subcommand' _gitian_cmds
+    return 0
+fi
+
+curcontext="${curcontext%:*:*}:gitian-$cmd:"
+
+args=(${(f)"$(_call_program gitian gitian shell-complete $cmd)"})
+_arguments -s "$args[@]" && ret=0
+return $ret
