@@ -9,14 +9,14 @@ import commands
 import re
 import tempfile
 import shutil
-import gitian_shell_complete
+from gitian_util import *
 from optparse import OptionParser
 #from gettext import gettext as _
 
 if __name__ == "__main__":
   parser = OptionParser()
   parser.prog = "gitian release-upload"
-  gitian_shell_complete.apply(parser)
+  optparser_extend(parser)
   parser.add_option ("-u", "--url",
       dest="url",
       help="Target rsync URL, or previously used URL if omitted")

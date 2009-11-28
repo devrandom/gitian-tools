@@ -1,3 +1,4 @@
 *-stamp
 *.substvars
 *.log
+*.pyc

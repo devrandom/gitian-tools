@@ -4,7 +4,7 @@
 
 import os
 import sys
-import gitian_shell_complete
+from gitian_util import *
 from optparse import OptionParser
 
 USAGE = """Usage: gitian package-new NAME REPOS-URL REPOS-COMMIT
@@ -13,7 +13,7 @@ USAGE = """Usage: gitian package-new NAME REPOS-URL REPOS-COMMIT
 if __name__ == "__main__":
   parser = OptionParser()
   parser.prog = "gitian package-build"
-  gitian_shell_complete.apply(parser)
+  optparser_extend(parser)
   (options, args) = parser.parse_args()
 
   if len(args) != 3:

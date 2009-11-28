@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 1.3.5") if s.respond_to? :required_rubygems_version=
   s.authors = ["Miron Cuperman"]
-  s.date = %q{2009-11-26}
+  s.date = %q{2009-11-27}
   s.description = %q{Add gitian sub-commands to the gem command}
   s.email = %q{info.deb@nginz.org}
   s.files = [

@@ -42,6 +42,7 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
 
     url = get_one_optional_argument || URL
     url = url + release
+    url += "/" if url[-1,1] != "/"
 
     sources = Gem.sources
     sources.reject! { |s| s == url || s == oldurl }

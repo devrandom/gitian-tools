@@ -8,14 +8,14 @@ import yaml
 import fnmatch
 import glob
 import shutil
-import gitian_shell_complete
+from gitian_util import *
 from optparse import OptionParser
 #from gettext import gettext as _
 
 if __name__ == "__main__":
   parser = OptionParser()
   parser.prog = "gitian release-build"
-  gitian_shell_complete.apply(parser)
+  optparser_extend(parser)
   parser.add_option ("-c", "--clean", default=False, action="store_true",
       dest="clean",
       help="Clean dist directory first")
@@ -38,7 +38,8 @@ if __name__ == "__main__":
     if options.dryrun:
       print dsc
       continue
-    res = os.system("gitian-package-build --dest %s %s"% ('stage', dsc))
+    res = os.system(find_command("package-build") + " --dest %s %s"%
+                    ('stage', dsc))
     if res != 0:
       print >> sys.stderr, "build failed for %s"% (dsc)
       sys.exit(1)
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 
   for gem_file in glob.glob('stage/rubygems/gems/*.gem'):
     new_file = os.path.join('dist/rubygems/gems', os.path.basename(gem_file))
-    os.system('gitian-gem-signer "%s" "%s"'%(gem_file, new_file))
+    os.system(find_command("gem-signer") + ' "%s" "%s"'%(gem_file, new_file))
 
   if (os.access('dist/rubygems', os.F_OK)):
     res = os.system("gem generate_index --directory dist/rubygems")

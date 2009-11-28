@@ -3,24 +3,17 @@
 import subprocess
 import sys
 import os
+sys.path.append(os.path.join(os.path.dirname(sys.argv[0]), "../lib"))
+from gitian_util import *
 
-def find_command(command):
+def check_command(command):
     if commands.get(command) is None:
         print>>sys.stderr, "usage: %s CMD\ntry: %s help"%(prog, prog)
         exit(1)
-    command = "gitian-" + command
-    for dir in [os.path.join(progdir, "../lib"), "/usr/lib/gitian"]:
-        if os.access(os.path.join(dir, command), os.F_OK):
-            found_dir = dir
-            break
-    if found_dir is None:
-        print>>sys.stderr, "installation problem - could not find subcommand"
-        exit(1)
-    return os.path.join(found_dir, command)
+    return find_command(command)
 
-args = sys.argv
+args = sys.argv[:]
 prog = args.pop(0)
-progdir = os.path.dirname(prog)
 
 if len(args) < 1:
     print>>sys.stderr, "usage: %s CMD\n\ntry:\n  %s help\nor:\n  %s help CMD"%(prog, prog, prog)
