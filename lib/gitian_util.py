@@ -2,6 +2,19 @@ import sys
 import os
 from optparse import SUPPRESS_HELP
 
+def repository_root():
+    dir = os.getcwd()
+    parent = os.path.dirname(dir)
+    while (parent != dir):
+        if os.access(os.path.join(dir, "gitian-repos"), os.F_OK):
+            return dir
+
+        dir = parent
+        parent = os.path.dirname(dir)
+
+    print >> sys.stderr, "must be run within the gitian repository"
+    exit(1)
+
 def shell_complete(option, opt, value, parser):
     for option in parser.option_list:
         for flag in str(option).split('/'):

@@ -13,74 +13,89 @@ from optparse import OptionParser
 #from gettext import gettext as _
 
 if __name__ == "__main__":
-  parser = OptionParser()
-  parser.prog = "gitian package-build"
-  optparser_extend(parser)
-  parser.add_option ("-d", "--dest",
-      dest="dest",
-      help="Destination directory (default ROOT/dist)")
-  (options, args) = parser.parse_args()
-  if not args:
-    parser.error("must supply .gdsc file")
-    exit(1)
+    parser = OptionParser()
+    parser.prog = "gitian package-build"
+    optparser_extend(parser)
+    parser.add_option ("-d", "--dest",
+                       dest="dest",
+                       help="Destination directory (default ROOT/dist)")
+    parser.usage = """gitian package-new [-c COMMIT] REPOS-URL [NAME]
+or:
+    gitian package-new GITHUB-COMMIT-URL [NAME]
+  Creates a package within a Gitian repository
+"""
+    (options, args) = parser.parse_args()
+    if not args:
+        parser.error("must supply package name")
+        exit(1)
 
-  if options.dest:
-    destination = os.path.abspath(options.dest)
-  else:
-    destination = "dist"
-  gems_destination = os.path.join(destination, "rubygems/gems")
+    repos = repository_root()
 
-  dsc_f = open(args[0])
-  package_dir = os.path.dirname(args[0])
-
-  os.chdir(package_dir)
-
-  dsc = yaml.load(dsc_f)
-  name = dsc['name']
-
-  ptr_f = open(name + '.vcptr')
-  ptr = yaml.load(ptr_f)
-
-  if not os.access("build", os.F_OK):
-    res = os.system("git clone --no-checkout '%s' build" % (ptr['url']))
-    if res != 0:
-      print >> sys.stderr, "git clone failed"
-      sys.exit(1)
-
-  res = os.system("cd build && git reset --hard '%s'" % (ptr['commit']))
-  if res != 0:
-    print >> sys.stderr, "git reset failed"
-    sys.exit(1)
-
-  res = os.system("cd build && git clean -d -f -x")
-  if res != 0:
-    print >> sys.stderr, "git clean failed"
-    sys.exit(1)
-
-  if dsc['packager'] == 'rubygems':
-    rake_cmd = dsc.get('packager_options', {}).get('rake_cmd', 'rake gem')
-    packages = dsc.get('packages')
-    if packages:
-      for package in packages:
-	print "Building package %s" % (package)
-	# default to package name
-	dir = dsc['directories'].get(package, package)
-	res = os.system("cd build/%s && %s" % (dir, rake_cmd))
-	if res != 0:
-	  print >> sys.stderr, "build in build/%s failed" % (dir)
-	  sys.exit(1)
+    if options.dest:
+        destination = os.path.abspath(options.dest)
     else:
-      package = name
-      print "Building package %s" % (package)
-      res = os.system("cd build && %s" % (rake_cmd))
-      if res != 0:
-	print >> sys.stderr, "build in build/ failed"
-	sys.exit(1)
-    for dirpath, dirs, files in os.walk('build'):
-      for file in fnmatch.filter(files, '*.gem'):
-	if not os.access(gems_destination, os.F_OK):
-	  os.makedirs(gems_destination)
-	shutil.copy(os.path.join(dirpath, file), gems_destination)
-  else:
-    print >> sys.stderr, "unknown packager %s" % (dsc['packager'])
-    
+        destination = os.path.join(repos, "dist")
+    gems_destination = os.path.join(destination, "rubygems/gems")
+
+    name = args[0]
+    package_dir = os.path.join(repos, "packages", name)
+
+    os.chdir(package_dir)
+
+    dsc_f = open("control")
+
+    if dsc_f is None:
+        print >> sys.stderr, "could not open control file"
+        sys.exit(1)
+
+    dsc = yaml.load(dsc_f)
+    name = dsc['name']
+
+    ptr_f = open(name + '.vcptr')
+    ptr = yaml.load(ptr_f)
+
+    if not os.access("build", os.F_OK):
+        res = os.system("git clone --no-checkout '%s' build" % (ptr['url']))
+        if res != 0:
+            print >> sys.stderr, "git clone failed"
+            sys.exit(1)
+
+        res = os.system("cd build && git reset --hard '%s'" % (ptr['commit']))
+        if res != 0:
+            print >> sys.stderr, "git reset failed"
+            sys.exit(1)
+
+    res = os.system("cd build && git clean -d -f -x")
+    if res != 0:
+        print >> sys.stderr, "git clean failed"
+        sys.exit(1)
+
+    packager_options = dsc.get('packager_options', {}) or {}
+
+    if dsc['packager'] == 'rubygems':
+        rake_cmd = packager_options.get('rake_cmd', 'rake gem')
+        packages = dsc.get('packages')
+        if packages:
+            for package in packages:
+                print "Building package %s" % (package)
+                # default to package name
+                dir = dsc['directories'].get(package, package)
+                res = os.system("cd build/%s && %s" % (dir, rake_cmd))
+                if res != 0:
+                    print >> sys.stderr, "build in build/%s failed" % (dir)
+                    sys.exit(1)
+        else:
+            package = name
+            print "Building package %s" % (package)
+            res = os.system("cd build && %s" % (rake_cmd))
+            if res != 0:
+                print >> sys.stderr, "build in build/ failed"
+                sys.exit(1)
+        for dirpath, dirs, files in os.walk('build'):
+            for file in fnmatch.filter(files, '*.gem'):
+                if not os.access(gems_destination, os.F_OK):
+                    os.makedirs(gems_destination)
+                shutil.copy(os.path.join(dirpath, file), gems_destination)
+    else:
+        print >> sys.stderr, "unknown packager %s" % (dsc['packager'])
+        

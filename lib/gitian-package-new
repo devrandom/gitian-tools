@@ -4,45 +4,76 @@
 
 import os
 import sys
+import re
 from gitian_util import *
 from optparse import OptionParser
+from urlparse import urlparse
 
-USAGE = """Usage: gitian package-new NAME REPOS-URL REPOS-COMMIT
-  Creates a new package within a Gitian repository
-"""
 if __name__ == "__main__":
-  parser = OptionParser()
-  parser.prog = "gitian package-build"
-  optparser_extend(parser)
-  (options, args) = parser.parse_args()
+    parser = OptionParser()
+    parser.prog = "gitian package-build"
+    parser.add_option ("-c", "--commit",
+                       dest="commit",
+                       help="Git commit (defaults to master head)")
+    parser.usage = """gitian package-new [-c COMMIT] REPOS-URL [NAME]
+or:
+    gitian package-new GITHUB-COMMIT-URL [NAME]
+  Creates a package within a Gitian repository
+"""
+    optparser_extend(parser)
+    (options, args) = parser.parse_args()
 
-  if len(args) != 3:
-    print >> sys.stderr, USAGE
-    exit(1)
 
-  name = args[0]
-  url = args[1]
-  commit = args[2]
+    if len(args) < 1 or len(args) > 2:
+        parser.print_usage()
+        exit(1)
 
-  if os.access(name, os.F_OK):
-    print >> sys.stderr, "already exists"
-    exit(1)
+    url = args[0]
 
-  os.makedirs(name)
-  f = open(os.path.join(name, name + ".gdsc"), "w")
-  f.write("""--- 
-name: "%s"
-packager: rubygems
-packager_options:
+    name = None
+    if len(args) == 2:
+        name = args[1]
+
+    p_url = urlparse(url)
+
+    if p_url.netloc == "github.com" and p_url.scheme == 'http':
+        match = re.match('\A/([^/]+)/([^/]+)/commit/([^/]+)\Z', p_url.path)
+        if match is None:
+            print >> sys.stderr, "could not parse github commit url"
+            exit(1)
+        url = "git://github.com/%s/%s.git"%(match.group(1), match.group(2))
+        commit = match.group(3)
+
+    if name is None:
+        match = re.match('.*/([^/.]+?)(.git)?\Z', url)
+        if match is None:
+            print >> sys.stderr, "could not parse git url"
+            exit(1)
+        
+        name = match.group(1)
+
+    repos = repository_root()
+    path = os.path.join(repos, "packages", name)
+
+    if os.access(path, os.F_OK):
+        print >> sys.stderr, "already exists"
+        exit(1)
+
+    os.makedirs(path)
+    f = open(os.path.join(path, "control"), "w")
+    f.write("""--- 
+  name: "%s"
+  packager: rubygems
+  packager_options:
   rake_cmd: "rake gem"
 """ % (name))
-  f.close()
+    f.close()
 
-  f = open(os.path.join(name, name + ".vcptr"), "w")
-  f.write("""---
-url: "%s"
-commit: %s
+    f = open(os.path.join(path, name + ".vcptr"), "w")
+    f.write("""---
+  url: "%s"
+  commit: %s
 """ % (url, commit))
-  f.close()
+    f.close()
 
-  print "created %s" %(name)
+    print "created %s" %(name)
