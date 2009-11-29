@@ -9,27 +9,6 @@ from gitian_util import *
 from optparse import OptionParser
 #from gettext import gettext as _
 
-def install_built_gems(dest):
-    gemrc = os.path.join(dest, "gemrc")
-    for dirpath, dirs, files in os.walk('build'):
-        for file in fnmatch.filter(files, '*.gem'):
-            res = os.system("gem --config-file '%s' install %s"%
-                            (gemrc, os.path.join(dirpath, file)))
-
-GEM_CHECK_COMMAND = "ruby -rlocal_rubygems -e 'gem \"%s\"' 2> /dev/null"
-
-def ensure_gem_installed(gem, dest):
-    res = os.system(GEM_CHECK_COMMAND%(gem))
-    print "%s %s"%(gem, res)
-    if res != 0:
-        (package_dir, control, ptr) = open_package(gem)
-        build_gem(package_dir, control, ptr, gems_destination)
-        install_built_gems(dest)
-
-        res = os.system(GEM_CHECK_COMMAND%(gem))
-        if res != 0:
-            print >>sys.stderr, "failed to install gem %s" % (gem)
-
 def ensure_rubygems_installed(dest):
     gemhome = os.path.join(dest, ".gem")
     if not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
@@ -37,7 +16,7 @@ def ensure_rubygems_installed(dest):
         os.chdir(package_dir)
 
         prepare_build_package(control, ptr)
-        res = os.system("cd build && ruby setup.rb --prefix=%s" % (gemhome))
+        res = os.system("cd build && ruby setup.rb --no-ri --no-rdoc --prefix=%s" % (gemhome))
         if res != 0 or not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
             print >>sys.stderr, "build failed in %s" % (dir)
             sys.exit(1)
@@ -46,7 +25,7 @@ def ensure_rubygems_installed(dest):
         rb_f = open(local_rubygems_rb, "w")
         print >>rb_f, """require "rubygems" 
 Gem.configuration = Gem::ConfigFile.new [ "--config-file=/dev/null" ] 
-Gem.sources = ["bogus:"]
+Gem.sources = ["/dev/null"]
 Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
 """
         rb_f.close()
@@ -87,7 +66,6 @@ or:
         destination = os.path.abspath(options.dest)
     else:
         destination = os.path.join(repos, "dist")
-    gems_destination = os.path.join(destination, "rubygems/gems")
 
     name = args[0]
     (package_dir, control, ptr) = open_package(name)
@@ -95,8 +73,8 @@ or:
     if control['packager'] == 'rubygems':
         ensure_rubygems_installed(destination)
         ensure_gem_installed('rake', destination)
-        build_gem(package_dir, control, ptr, gems_destination)
-        copy_gems_to_dist(gems_destination)
+        build_gem(package_dir, control, ptr, destination)
+        copy_gems_to_dist(destination)
     else:
         print >> sys.stderr, "unknown packager %s" % (control['packager'])
         

@@ -65,7 +65,7 @@ or:
   name: "%s"
   packager: rubygems
   packager_options:
-  rake_cmd: "rake gem"
+    rake_cmd: "rake -rlocal_rubygems gem"
 """ % (name))
     f.close()
 

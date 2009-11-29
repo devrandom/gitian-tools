@@ -27,10 +27,10 @@ def open_package(name):
 
     package_dir = os.path.join(repos, "packages", name)
 
-    control_f = open(os.path.join(package_dir, "control"))
-
-    if control_f is None:
-        print >> sys.stderr, "could not open control file"
+    try:
+        control_f = open(os.path.join(package_dir, "control"))
+    except IOError, e:
+        print >> sys.stderr, "package does not exist - %s"%(name)
         sys.exit(1)
 
     control = yaml.load(control_f)
@@ -97,8 +97,12 @@ def build_gem(package_dir, control, ptr, destination):
 
     packager_options = control.get('packager_options', {}) or {}
 
-    rake_cmd = packager_options.get('rake_cmd', 'rake -rlocal_rubygems gem')
+    rake_cmd = packager_options.get('rake_cmd', 'rake -t -rlocal_rubygems gem')
     packages = control.get('packages')
+
+    depends = control.get('build_depends', []) or []
+    for depend in depends:
+        ensure_gem_installed(depend, destination)
 
     if packages:
         for package in packages:
@@ -117,9 +121,46 @@ def build_gem(package_dir, control, ptr, destination):
             sys.exit(1)
 
 def copy_gems_to_dist(destination):
+    gems_destination = os.path.join(destination, "rubygems/gems")
     for dirpath, dirs, files in os.walk('build'):
         for file in fnmatch.filter(files, '*.gem'):
-            if not os.access(destination, os.F_OK):
-                os.makedirs(destination)
-            shutil.copy(os.path.join(dirpath, file), destination)
+            if not os.access(gems_destination, os.F_OK):
+                os.makedirs(gems_destination)
+            shutil.copy(os.path.join(dirpath, file), gems_destination)
+
+GEM_CHECK_COMMAND = "ruby -rlocal_rubygems -e 'exit(Gem.source_index.find_name(\"%s\").length==0?1:0)'"
+
+def ensure_gem_installed(gem, dest):
+    components = gem.split("/")
+    if len(components) == 1:
+        package = gem
+    else:
+        (package, gem) = components
+
+    res = os.system(GEM_CHECK_COMMAND%(gem))
+    print "%s %s"%(gem, res)
+    if res != 0:
+        (package_dir, control, ptr) = open_package(package)
+        build_gem(package_dir, control, ptr, dest)
+        install_built_gems(dest, gem)
+
+        res = os.system(GEM_CHECK_COMMAND%(gem))
+        if res != 0:
+            print >>sys.stderr, "failed to install gem %s" % (gem)
+
+def install_built_gems(dest, gem = None):
+    gemrc = os.path.join(dest, "gemrc")
+    for dirpath, dirs, files in os.walk('build'):
+        if gem is None:
+            pattern = '*.gem'
+        else:
+            pattern = "%s-*.gem"%(gem)
+
+        for file in fnmatch.filter(files, pattern):
+            cmd = "gem --config-file '%s' install --no-ri --no-rdoc --ignore-dependencies %s"%(
+                gemrc, os.path.join(dirpath, file))
+            print cmd
+            res = os.system(cmd)
+            if res != 0:
+                print >>sys.stderr, "failed to install gem with: %s" % (cmd)
 
