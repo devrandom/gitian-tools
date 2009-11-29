@@ -5,12 +5,64 @@
 import sys
 import os
 import git
-import yaml
-import fnmatch
-import shutil
 from gitian_util import *
 from optparse import OptionParser
 #from gettext import gettext as _
+
+def install_built_gems(dest):
+    gemrc = os.path.join(dest, "gemrc")
+    for dirpath, dirs, files in os.walk('build'):
+        for file in fnmatch.filter(files, '*.gem'):
+            res = os.system("gem --config-file '%s' install %s"%
+                            (gemrc, os.path.join(dirpath, file)))
+
+GEM_CHECK_COMMAND = "ruby -rlocal_rubygems -e 'gem \"%s\"' 2> /dev/null"
+
+def ensure_gem_installed(gem, dest):
+    res = os.system(GEM_CHECK_COMMAND%(gem))
+    print "%s %s"%(gem, res)
+    if res != 0:
+        (package_dir, control, ptr) = open_package(gem)
+        build_gem(package_dir, control, ptr, gems_destination)
+        install_built_gems(dest)
+
+        res = os.system(GEM_CHECK_COMMAND%(gem))
+        if res != 0:
+            print >>sys.stderr, "failed to install gem %s" % (gem)
+
+def ensure_rubygems_installed(dest):
+    gemhome = os.path.join(dest, ".gem")
+    if not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
+        (package_dir, control, ptr) = open_package("rubygems")
+        os.chdir(package_dir)
+
+        prepare_build_package(control, ptr)
+        res = os.system("cd build && ruby setup.rb --prefix=%s" % (gemhome))
+        if res != 0 or not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
+            print >>sys.stderr, "build failed in %s" % (dir)
+            sys.exit(1)
+    local_rubygems_rb = os.path.join(gemhome, "lib", "local_rubygems.rb")
+    if not os.access(local_rubygems_rb, os.F_OK):
+        rb_f = open(local_rubygems_rb, "w")
+        print >>rb_f, """require "rubygems" 
+Gem.configuration = Gem::ConfigFile.new [ "--config-file=/dev/null" ] 
+Gem.sources = ["bogus:"]
+Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
+"""
+        rb_f.close()
+    gemrc = os.path.join(dest, "gemrc")
+    if not os.access(gemrc, os.F_OK):
+        gemrc_f = open(gemrc, "w")
+        print >>gemrc_f, """---
+:gemhome: %s
+:gempath:
+- %s
+:sources:
+- bogus:
+"""%(gemhome, gemhome)
+        gemrc_f.close()
+    os.environ['GEM_HOME'] = gemhome
+    os.environ['RUBYLIB'] = os.path.join(gemhome, "lib")
 
 if __name__ == "__main__":
     parser = OptionParser()
@@ -38,64 +90,13 @@ or:
     gems_destination = os.path.join(destination, "rubygems/gems")
 
     name = args[0]
-    package_dir = os.path.join(repos, "packages", name)
+    (package_dir, control, ptr) = open_package(name)
 
-    os.chdir(package_dir)
-
-    dsc_f = open("control")
-
-    if dsc_f is None:
-        print >> sys.stderr, "could not open control file"
-        sys.exit(1)
-
-    dsc = yaml.load(dsc_f)
-    name = dsc['name']
-
-    ptr_f = open(name + '.vcptr')
-    ptr = yaml.load(ptr_f)
-
-    if not os.access("build", os.F_OK):
-        res = os.system("git clone --no-checkout '%s' build" % (ptr['url']))
-        if res != 0:
-            print >> sys.stderr, "git clone failed"
-            sys.exit(1)
-
-        res = os.system("cd build && git reset --hard '%s'" % (ptr['commit']))
-        if res != 0:
-            print >> sys.stderr, "git reset failed"
-            sys.exit(1)
-
-    res = os.system("cd build && git clean -d -f -x")
-    if res != 0:
-        print >> sys.stderr, "git clean failed"
-        sys.exit(1)
-
-    packager_options = dsc.get('packager_options', {}) or {}
-
-    if dsc['packager'] == 'rubygems':
-        rake_cmd = packager_options.get('rake_cmd', 'rake gem')
-        packages = dsc.get('packages')
-        if packages:
-            for package in packages:
-                print "Building package %s" % (package)
-                # default to package name
-                dir = dsc['directories'].get(package, package)
-                res = os.system("cd build/%s && %s" % (dir, rake_cmd))
-                if res != 0:
-                    print >> sys.stderr, "build in build/%s failed" % (dir)
-                    sys.exit(1)
-        else:
-            package = name
-            print "Building package %s" % (package)
-            res = os.system("cd build && %s" % (rake_cmd))
-            if res != 0:
-                print >> sys.stderr, "build in build/ failed"
-                sys.exit(1)
-        for dirpath, dirs, files in os.walk('build'):
-            for file in fnmatch.filter(files, '*.gem'):
-                if not os.access(gems_destination, os.F_OK):
-                    os.makedirs(gems_destination)
-                shutil.copy(os.path.join(dirpath, file), gems_destination)
+    if control['packager'] == 'rubygems':
+        ensure_rubygems_installed(destination)
+        ensure_gem_installed('rake', destination)
+        build_gem(package_dir, control, ptr, gems_destination)
+        copy_gems_to_dist(gems_destination)
     else:
-        print >> sys.stderr, "unknown packager %s" % (dsc['packager'])
+        print >> sys.stderr, "unknown packager %s" % (control['packager'])
         

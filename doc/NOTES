@@ -1,0 +1,15 @@
+ruby -e 'require "rubygems" ; Gem.configuration = Gem::ConfigFile.new [ "--config-file=/tmp/g" ] ; puts Gem.configuration.inspect; Gem.use_paths(Gem.configuration[:gemhome], Gem.configuration[:gempath]) ; require "rubygems/commands/environment_command" ; c = Gem::Commands::EnvironmentCommand.new() ; c.handle_options([]) ; c.execute
+
+create local_rubygems.rb with:
+
+require "rubygems" 
+Gem.configuration = Gem::ConfigFile.new [ "--config-file=/dev/null" ] 
+Gem.sources = ["bogus:"]
+Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
+
+set RUBYLIB pointing to local rubygems and local_rubygems.rb
+set GEM_HOME
+
+run rake:
+
+rake -rlocal_rubygems
