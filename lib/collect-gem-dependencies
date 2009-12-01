@@ -1,0 +1,33 @@
+#!/usr/bin/ruby
+
+dir = File.expand_path $*[0]
+
+$:.unshift dir + "/.gem/lib"
+require 'local_rubygems'
+
+index = Gem::SourceIndex.new
+index.update("file://#{dir}/rubygems", true)
+
+specs = {}
+deps = []
+
+index.gems.values.each do |spec|
+  specs[spec.name] = spec
+  spec.dependencies.each do |dep|
+    if dep.type == :runtime
+      deps << dep
+    end
+  end
+end
+
+unsat = false
+deps.each do |dep|
+  unless specs[dep.name] && dep =~ specs[dep.name]
+    puts "Unsatisfied: #{dep.name} #{dep.version_requirements}"
+    unsat = true
+  else
+    #puts "#{dep.inspect} satisfied by #{specs[dep.name].version}"
+  end
+end
+
+exit(1) if unsat

@@ -76,17 +76,22 @@ def optparser_extend(parser):
                       )
 
 def find_command(command):
-    command = "gitian-" + command
     progdir = os.path.dirname(sys.argv[0])
-    found_dir = None
+
     for dir in [os.path.join(progdir, "../lib"), "/usr/lib/gitian"]:
         if os.access(os.path.join(dir, command), os.F_OK):
             found_dir = dir
-            break
-    if found_dir is None:
-        print>>sys.stderr, "installation problem - could not find subcommand %s"%(command)
-        exit(1)
-    return os.path.join(found_dir, command)
+            return os.path.join(dir, command)
+
+    command = "gitian-" + command
+
+    for dir in [os.path.join(progdir, "../lib"), "/usr/lib/gitian"]:
+        if os.access(os.path.join(dir, command), os.F_OK):
+            found_dir = dir
+            return os.path.join(dir, command)
+
+    print>>sys.stderr, "installation problem - could not find subcommand %s"%(command)
+    exit(1)
 
 def build_gem(package_dir, control, ptr, destination):
     name = control['name']
@@ -97,7 +102,7 @@ def build_gem(package_dir, control, ptr, destination):
 
     packager_options = control.get('packager_options', {}) or {}
 
-    rake_cmd = packager_options.get('rake_cmd', 'rake -t -rlocal_rubygems gem')
+    build_cmd = packager_options.get('build_cmd', 'rake -t -rlocal_rubygems gem')
     packages = control.get('packages')
 
     depends = control.get('build_depends', []) or []
@@ -109,13 +114,13 @@ def build_gem(package_dir, control, ptr, destination):
             print "Building package %s" % (package)
             # default to package name
             dir = control['directories'].get(package, package)
-            res = os.system("cd build/%s && %s" % (dir, rake_cmd))
+            res = os.system("cd build/%s && %s" % (dir, build_cmd))
             if res != 0:
                 print >> sys.stderr, "build in build/%s failed" % (dir)
                 sys.exit(1)
     else:
         print "Building gem %s" % (name)
-        res = os.system("cd build && %s" % (rake_cmd))
+        res = os.system("cd build && %s" % (build_cmd))
         if res != 0:
             print >> sys.stderr, "build failed"
             sys.exit(1)

@@ -62,10 +62,10 @@ or:
     os.makedirs(path)
     f = open(os.path.join(path, "control"), "w")
     f.write("""--- 
-  name: "%s"
-  packager: rubygems
-  packager_options:
-    rake_cmd: "rake -rlocal_rubygems gem"
+name: "%s"
+packager: rubygems
+packager_options:
+  build_cmd: "rake -rlocal_rubygems gem"
 """ % (name))
     f.close()
 

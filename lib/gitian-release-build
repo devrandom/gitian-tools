@@ -56,3 +56,7 @@ if __name__ == "__main__":
     if res != 0:
       print >> sys.stderr, "gem generate_index failed"
       sys.exit(1)
+
+  res = os.system(find_command("collect-gem-dependencies") + " %s"%('dist'))
+  if res != 0:
+    sys.exit(1)
