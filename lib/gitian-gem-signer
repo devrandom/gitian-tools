@@ -23,7 +23,6 @@ File.open(outfile, "wb") do |out_f|
 	spec = in_pkg.metadata
 	spec.cert_chain = signer.cert_chain.map { |cert| cert.to_s }
 	out_pkg.metadata = spec.to_yaml
-	puts spec.cert_chain
 	in_pkg.each do |entry|
 	  out_pkg.add_file_simple entry.full_name, entry.header.mode, entry.header.size do |tar_io|
 	    content = open(file, "rb") { |f| entry.read }

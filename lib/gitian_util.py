@@ -93,7 +93,7 @@ def find_command(command):
     print>>sys.stderr, "installation problem - could not find subcommand %s"%(command)
     exit(1)
 
-def build_gem(package_dir, control, ptr, destination):
+def build_gem(package_dir, control, ptr, destination, do_copy=False):
     name = control['name']
 
     os.chdir(package_dir)
@@ -109,26 +109,35 @@ def build_gem(package_dir, control, ptr, destination):
     for depend in depends:
         ensure_gem_installed(depend, destination)
 
+    os.chdir(package_dir)
+
     if packages:
         for package in packages:
-            print "Building package %s" % (package)
+            print "Building package %s (copy=%s)" % (package, do_copy)
             # default to package name
             dir = control['directories'].get(package, package)
-            res = os.system("cd build/%s && %s" % (dir, build_cmd))
+            subdir = os.path.join("build", dir)
+            res = os.system("cd %s && %s" % (subdir, build_cmd))
             if res != 0:
                 print >> sys.stderr, "build in build/%s failed" % (dir)
                 sys.exit(1)
+            if do_copy:
+                copy_gems_to_dist(subdir, destination)
+
     else:
-        print "Building gem %s" % (name)
+        print "Building package %s (copy=%s)" % (name, do_copy)
         res = os.system("cd build && %s" % (build_cmd))
         if res != 0:
             print >> sys.stderr, "build failed"
             sys.exit(1)
+        if do_copy:
+            copy_gems_to_dist("build", destination)
 
-def copy_gems_to_dist(destination):
+def copy_gems_to_dist(subdir, destination):
+    print "installing to %s"%(destination)
     gems_destination = os.path.join(destination, "rubygems/gems")
-    for dirpath, dirs, files in os.walk('build'):
-        for file in fnmatch.filter(files, '*.gem'):
+    for dirpath, dirs, files in os.walk(subdir):
+        for file in fnmatch.filter(files, '*-*.*.*.gem'):
             if not os.access(gems_destination, os.F_OK):
                 os.makedirs(gems_destination)
             shutil.copy(os.path.join(dirpath, file), gems_destination)
@@ -143,7 +152,6 @@ def ensure_gem_installed(gem, dest):
         (package, gem) = components
 
     res = os.system(GEM_CHECK_COMMAND%(gem))
-    print "%s %s"%(gem, res)
     if res != 0:
         (package_dir, control, ptr) = open_package(package)
         build_gem(package_dir, control, ptr, dest)
@@ -168,4 +176,38 @@ def install_built_gems(dest, gem = None):
             res = os.system(cmd)
             if res != 0:
                 print >>sys.stderr, "failed to install gem with: %s" % (cmd)
+
+def ensure_rubygems_installed(dest):
+    gemhome = os.path.join(dest, ".gem")
+    if not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
+        (package_dir, control, ptr) = open_package("rubygems")
+        os.chdir(package_dir)
+
+        prepare_build_package(control, ptr)
+        res = os.system("cd build && ruby setup.rb --no-ri --no-rdoc --prefix=%s" % (gemhome))
+        if res != 0 or not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
+            print >>sys.stderr, "build failed in %s" % (dir)
+            sys.exit(1)
+    local_rubygems_rb = os.path.join(gemhome, "lib", "local_rubygems.rb")
+    if not os.access(local_rubygems_rb, os.F_OK):
+        rb_f = open(local_rubygems_rb, "w")
+        print >>rb_f, """require "rubygems" 
+Gem.configuration = Gem::ConfigFile.new [ "--config-file=/dev/null" ] 
+Gem.sources = ["/dev/null"]
+Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
+"""
+        rb_f.close()
+    gemrc = os.path.join(dest, "gemrc")
+    if not os.access(gemrc, os.F_OK):
+        gemrc_f = open(gemrc, "w")
+        print >>gemrc_f, """---
+:gemhome: %s
+:gempath:
+- %s
+:sources:
+- bogus:
+"""%(gemhome, gemhome)
+        gemrc_f.close()
+    os.environ['GEM_HOME'] = gemhome
+    os.environ['RUBYLIB'] = os.path.join(gemhome, "lib")
 

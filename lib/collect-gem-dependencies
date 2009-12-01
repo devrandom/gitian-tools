@@ -4,6 +4,7 @@ dir = File.expand_path $*[0]
 
 $:.unshift dir + "/.gem/lib"
 require 'local_rubygems'
+require 'uri'
 
 index = Gem::SourceIndex.new
 index.update("file://#{dir}/rubygems", true)
