@@ -44,5 +44,6 @@ elif args[0] == 'shell-complete':
 else:
     command = args.pop(0)
     command_path = find_command(command)
+    args.insert(0, command_path)
     os.execv(command_path, args)
 

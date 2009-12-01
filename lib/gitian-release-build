@@ -13,76 +13,76 @@ from optparse import OptionParser
 #from gettext import gettext as _
 
 if __name__ == "__main__":
-  parser = OptionParser()
-  parser.prog = "gitian release-build"
-  optparser_extend(parser)
-  parser.add_option ("-c", "--clean", default=False, action="store_true",
-      dest="clean",
-      help="Clean dist directory first")
-  parser.add_option ("-n", "--dry-run", default=False, action="store_true",
-      dest="dryrun",
-      help="Do not actually build anything, but still generate release index")
+    parser = OptionParser()
+    parser.prog = "gitian release-build"
+    optparser_extend(parser)
+    parser.add_option ("-c", "--clean", default=False, action="store_true",
+                       dest="clean",
+                       help="Clean dist directory first")
+    parser.add_option ("-n", "--dry-run", default=False, action="store_true",
+                       dest="dryrun",
+            help="Do not actually build anything, but still generate release index")
 
-  (options, args) = parser.parse_args()
+    (options, args) = parser.parse_args()
 
-  repos = repository_root()
-  os.chdir(repos)
+    repos = repository_root()
+    os.chdir(repos)
 
-  destination = os.path.join(repos, "dist")
+    destination = os.path.join(repos, "dist")
 
-  if not os.access("gitian-repos", os.F_OK):
-    print >> sys.stderr, "must be run within the gitian repository"
-    exit(1)
-  
-  if options.clean and os.access('dist', os.F_OK):
-    shutil.rmtree('dist')
+    if not os.access("gitian-repos", os.F_OK):
+        print >> sys.stderr, "must be run within the gitian repository"
+        exit(1)
+    
+    if options.clean and os.access('dist', os.F_OK):
+        shutil.rmtree('dist')
 
-  if options.clean and os.access('stage', os.F_OK):
-    shutil.rmtree('stage')
-  
-  print "Building packages"
+    if options.clean and os.access('stage', os.F_OK):
+        shutil.rmtree('stage')
+    
+    print "Building packages"
 
-  if options.dryrun:
-      print "[DRYRUN]"
-
-  for dsc in glob.glob('packages/*/control'):
-    package = os.path.basename(os.path.dirname(dsc))
-    print " - " + package
     if options.dryrun:
-      continue
-    res = os.system(find_command("package-build") + " --dest %s %s > logs/build.log 2>&1"%
-                    (os.path.abspath('stage'), package))
+            print "[DRYRUN]"
+
+    for dsc in glob.glob('packages/*/control'):
+        package = os.path.basename(os.path.dirname(dsc))
+        print " - " + package
+        if options.dryrun:
+            continue
+        res = os.system(find_command("package-build") + " --dest %s %s > logs/build-%s.log 2>&1"%
+                        (os.path.abspath('stage'), package, package))
+        if res != 0:
+            print >> sys.stderr, "build failed - see logs/build-%s.log"% (package, package)
+            sys.exit(1)
+
+    stage_gems_dir = os.path.join("stage", "rubygems", "gems")
+    dist_gems_dir = os.path.join(destination, "rubygems", "gems")
+
+    if not os.access("logs", os.F_OK):
+        os.makedirs("logs")
+
+    if not os.access(dist_gems_dir, os.F_OK):
+        os.makedirs(dist_gems_dir)
+
+    ensure_rubygems_installed(destination)
+    ensure_gem_installed('rake', destination)
+    ensure_gem_installed('builder', destination)
+
+    print "Signing gems"
+    for gem_file in glob.glob(os.path.join(stage_gems_dir, '*.gem')):
+        new_file = os.path.join(dist_gems_dir, os.path.basename(gem_file))
+        res = os.system(find_command("gem-signer") + ' "%s" "%s"'%(gem_file, new_file))
+        if res != 0:
+            print >> sys.stderr, "gem signing failed for %s"%(gem_file)
+            sys.exit(1)
+
+    print "Indexing gems"
+    res = os.system("gem generate_index --directory dist/rubygems > logs/generate_index.log")
     if res != 0:
-      print >> sys.stderr, "build failed for %s - see logs/build.log"% (package)
-      sys.exit(1)
+        print >> sys.stderr, "gem generate_index failed - see logs/generate_index.log"
+        sys.exit(1)
 
-  stage_gems_dir = os.path.join("stage", "rubygems", "gems")
-  dist_gems_dir = os.path.join(destination, "rubygems", "gems")
-
-  if not os.access("logs", os.F_OK):
-    os.makedirs("logs")
-
-  if not os.access(dist_gems_dir, os.F_OK):
-    os.makedirs(dist_gems_dir)
-
-  ensure_rubygems_installed(destination)
-  ensure_gem_installed('rake', destination)
-  ensure_gem_installed('builder', destination)
-
-  print "Signing gems"
-  for gem_file in glob.glob(os.path.join(stage_gems_dir, '*.gem')):
-    new_file = os.path.join(dist_gems_dir, os.path.basename(gem_file))
-    res = os.system(find_command("gem-signer") + ' "%s" "%s"'%(gem_file, new_file))
+    res = os.system(find_command("collect-gem-dependencies") + " %s"%('dist'))
     if res != 0:
-      print >> sys.stderr, "gem signing failed for %s"%(gem_file)
-      sys.exit(1)
-
-  print "Indexing gems"
-  res = os.system("gem generate_index --directory dist/rubygems > logs/generate_index.log")
-  if res != 0:
-    print >> sys.stderr, "gem generate_index failed - see logs/generate_index.log"
-    sys.exit(1)
-
-  res = os.system(find_command("collect-gem-dependencies") + " %s"%('dist'))
-  if res != 0:
-    sys.exit(1)
+        sys.exit(1)
