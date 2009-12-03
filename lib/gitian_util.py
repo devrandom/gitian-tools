@@ -7,7 +7,7 @@ from optparse import SUPPRESS_HELP
 
 def prepare_build_package(ptr, do_clean = False):
     if not os.access("build", os.F_OK):
-        os.mkdirs("build")
+        os.makedirs("build")
         res = os.system("cd build && git init")
         if res != 0:
             print >> sys.stderr, "git init failed"
@@ -16,13 +16,13 @@ def prepare_build_package(ptr, do_clean = False):
         do_clean = True
 
     if do_clean:
-        os.system("cd build && git remote rm origin")
+        os.system("cd build && git remote | grep --quiet '^origin$' && git remote rm origin")
         res = os.system("cd build && git remote add origin '%s'" % (ptr['url']))
         if res != 0:
             print >> sys.stderr, "git remote add failed"
             sys.exit(1)
 
-        res = os.system("cd build && git fetch origin")
+        res = os.system("cd build && git fetch --quiet origin")
         if res != 0:
             print >> sys.stderr, "git fetch failed"
             sys.exit(1)
@@ -226,4 +226,8 @@ Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
     os.environ['GEM_HOME'] = gemhome
     os.environ['PATH'] = os.path.join(gemhome, "bin") + ":" + os.environ['PATH']
     os.environ['RUBYLIB'] = os.path.join(gemhome, "lib")
+    os.environ['RAKE_CMD'] = "rake -rlocal_rubygems"
+    os.environ['RAKE_ARGS'] = "-rlocal_rubygems"
+    os.environ['GEM_CMD'] = "gem --config-file=%s"%(gemrc)
+    os.environ['GEM_ARGS'] = "--config-file=%s"%(gemrc)
 

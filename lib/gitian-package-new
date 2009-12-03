@@ -63,25 +63,28 @@ or:
 
     created = False
 
-    control = os.path.join(path, "control")
-    if not os.access(control, os.F_OK):
+    control_path = os.path.join(path, "control")
+    if not os.access(control_path, os.F_OK):
         created = True
         os.makedirs(path)
-        f = open(control, "w")
-        f.write("""--- 
-name: "%s"
-packager: rubygems
-packager_options:
-  build_cmd: "rake -rlocal_rubygems gem"
-""" % (name))
-        f.close()
+        control_f = open(control_path, "w")
+        control = {
+            'name': name,
+            'packager': 'rubygems',
+            'packager_options':
+            {
+                'build_cmd': "$RAKE_CMD gem"
+            }
+        }
+        yaml.dump(control, control_f,
+                  default_flow_style=False, explicit_start=True)
+        control_f.close()
 
-    f = open(os.path.join(path, name + ".vcptr"), "w")
-    f.write("""---
-  url: "%s"
-  commit: %s
-""" % (url, commit))
-    f.close()
+    ptr_f = open(os.path.join(path, name + ".vcptr"), "w")
+    ptr = { 'url': url, 'commit': commit }
+    yaml.dump(ptr, ptr_f,
+              default_flow_style=False, explicit_start=True)
+    ptr_f.close()
 
     (package_dir, control, ptr) = open_package(name)
     os.chdir(package_dir)

@@ -48,6 +48,7 @@ if __name__ == "__main__":
     if options.dryrun:
             print "[DRYRUN]"
 
+    failures = 0
     for dsc in glob.glob('packages/*/control'):
         package = os.path.basename(os.path.dirname(dsc))
         print " - " + package
@@ -56,8 +57,8 @@ if __name__ == "__main__":
         res = os.system(find_command("package-build") + " --dest %s %s > logs/build-%s.log 2>&1"%
                         (os.path.abspath('stage'), package, package))
         if res != 0:
-            print >> sys.stderr, "build failed - see logs/build-%s.log"% (package)
-            sys.exit(1)
+            print >> sys.stderr, "FAILED - see logs/build-%s.log"% (package)
+            failures += 1
 
     stage_gems_dir = os.path.join("stage", "rubygems", "gems")
     dist_gems_dir = os.path.join(destination, "rubygems", "gems")
@@ -68,6 +69,10 @@ if __name__ == "__main__":
     ensure_rubygems_installed(destination)
     ensure_gem_installed('rake', destination)
     ensure_gem_installed('builder', destination)
+
+    if failures:
+        print >> sys.stderr, "failed to build %s packages"
+        sys.exit(1)
 
     os.chdir(repos)
 
