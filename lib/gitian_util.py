@@ -187,7 +187,6 @@ def install_built_gems(dest, gem = None):
         for file in fnmatch.filter(files, pattern):
             cmd = "gem --config-file '%s' install --no-ri --no-rdoc --ignore-dependencies %s"%(
                 gemrc, os.path.join(dirpath, file))
-            print cmd
             res = os.system(cmd)
             if res != 0:
                 print >>sys.stderr, "failed to install gem with: %s" % (cmd)
@@ -199,7 +198,7 @@ def ensure_rubygems_installed(dest):
         os.chdir(package_dir)
 
         prepare_build_package(ptr)
-        res = os.system("cd build && ruby setup.rb --no-ri --no-rdoc --prefix=%s" % (gemhome))
+        res = os.system("cd build && ruby setup.rb --no-ri --no-rdoc --prefix=%s > /dev/null" % (gemhome))
         if res != 0 or not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
             print >>sys.stderr, "build failed in %s" % (dir)
             sys.exit(1)

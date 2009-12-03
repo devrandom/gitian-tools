@@ -16,9 +16,12 @@ if __name__ == "__main__":
     parser = OptionParser()
     parser.prog = "gitian release-build"
     optparser_extend(parser)
+    parser.add_option ("-b", "--blankslate", default=False, action="store_true",
+                       dest="blankslate",
+                       help="Start building from a blank slate")
     parser.add_option ("-c", "--clean", default=False, action="store_true",
                        dest="clean",
-                       help="Clean dist directory first and clean after each package build")
+                       help="Clean each package checkout before building")
     parser.add_option ("-n", "--dry-run", default=False, action="store_true",
                        dest="dryrun",
             help="Do not actually build anything, but still generate release index")
@@ -34,10 +37,10 @@ if __name__ == "__main__":
         print >> sys.stderr, "must be run within the gitian repository"
         exit(1)
     
-    if options.clean and os.access('dist', os.F_OK):
+    if options.blankslate and os.access('dist', os.F_OK):
         shutil.rmtree('dist')
 
-    if options.clean and os.access('stage', os.F_OK):
+    if options.blankslate and os.access('stage', os.F_OK):
         shutil.rmtree('stage')
     
     if not os.access("logs", os.F_OK):
@@ -54,14 +57,23 @@ if __name__ == "__main__":
         print " - " + package
         if options.dryrun:
             continue
-        res = os.system(find_command("package-build") + " --dest %s %s > logs/build-%s.log 2>&1"%
-                        (os.path.abspath('stage'), package, package))
+
+        blankslate_option = ''
+        if options.blankslate:
+            blankslate_option = ' --blankslate'
+
+        clean_option = ''
+        if options.clean:
+            clean_option = ' --clean'
+        res = os.system(find_command("package-build") + "%s%s --dest %s %s > logs/build-%s.log 2>&1"%
+                        (blankslate_option,
+                         clean_option,
+                         os.path.abspath('stage'),
+                         package,
+                         package))
         if res != 0:
             print >> sys.stderr, "FAILED - see logs/build-%s.log"% (package)
             failures += 1
-
-        if options.clean:
-            shutil.rmtree(os.path.join('stage', '.gem'))
 
     stage_gems_dir = os.path.join("stage", "rubygems", "gems")
     dist_gems_dir = os.path.join(destination, "rubygems", "gems")

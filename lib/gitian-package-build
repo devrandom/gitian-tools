@@ -16,6 +16,9 @@ if __name__ == "__main__":
     parser.add_option ("-c", "--clean", default=False, action="store_true",
                        dest="clean",
                        help="Start from a pristine checkout")
+    parser.add_option ("-b", "--blankslate", default=False, action="store_true",
+                       dest="blankslate",
+                       help="Clean out all installed gems before attempting build")
     parser.add_option ("-d", "--dest",
                        dest="dest",
                        help="Destination directory (default ROOT/dist)")
@@ -40,6 +43,10 @@ or:
     (package_dir, control, ptr) = open_package(name)
 
     if control['packager'] == 'rubygems':
+        if options.blankslate:
+            rubygems_dir = os.path.join(destination, '.gem')
+            if os.access(rubygems_dir, os.F_OK):
+                shutil.rmtree(rubygems_dir)
         ensure_rubygems_installed(destination)
         ensure_gem_installed('rake', destination)
         build_gem(package_dir, control, ptr, destination, True, options.clean)
