@@ -18,7 +18,7 @@ if __name__ == "__main__":
     optparser_extend(parser)
     parser.add_option ("-c", "--clean", default=False, action="store_true",
                        dest="clean",
-                       help="Clean dist directory first")
+                       help="Clean dist directory first and clean after each package build")
     parser.add_option ("-n", "--dry-run", default=False, action="store_true",
                        dest="dryrun",
             help="Do not actually build anything, but still generate release index")
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     print "Building packages"
 
     if options.dryrun:
-            print "[DRYRUN]"
+        print "[DRYRUN]"
 
     failures = 0
     for dsc in glob.glob('packages/*/control'):
@@ -60,6 +60,9 @@ if __name__ == "__main__":
             print >> sys.stderr, "FAILED - see logs/build-%s.log"% (package)
             failures += 1
 
+        if options.clean:
+            shutil.rmtree(os.path.join('stage', '.gem'))
+
     stage_gems_dir = os.path.join("stage", "rubygems", "gems")
     dist_gems_dir = os.path.join(destination, "rubygems", "gems")
 
@@ -71,7 +74,7 @@ if __name__ == "__main__":
     ensure_gem_installed('builder', destination)
 
     if failures:
-        print >> sys.stderr, "failed to build %s packages"
+        print >> sys.stderr, "failed to build %s packages"%(failures)
         sys.exit(1)
 
     os.chdir(repos)

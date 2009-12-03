@@ -47,6 +47,7 @@ File.open(outfile, "wb") do |out_f|
 	spec = in_pkg.metadata
         out_pkg.io.mtime = spec.date.to_i
 	spec.cert_chain = signer.cert_chain.map { |cert| cert.to_s }
+
         # Make specs deterministic by sorting anything that might be
         # reordered.  Specs should be identical other than the cert_chain.
         spec.files = spec.files.sort
@@ -54,9 +55,19 @@ File.open(outfile, "wb") do |out_f|
         spec.extra_rdoc_files = spec.extra_rdoc_files.sort
         spec.executables = spec.executables.sort
 	out_pkg.metadata = spec.to_yaml
+
+        entries = {}
+        # FIXME should not read everything into memory
 	in_pkg.each do |entry|
+          content = entry.read
+          entries[entry.full_name] = [ entry, content ]
+        end
+
+        # Sort entries to make data tar deterministic
+        entries.keys.sort.each do |key|
+          entry = entries[key][0]
+          content = entries[key][1]
 	  out_pkg.add_file_simple entry.full_name, entry.header.mode, entry.header.size do |tar_io|
-	    content = open(file, "rb") { |f| entry.read }
 	    tar_io.write content unless content.nil?
 	  end
 	end
