@@ -40,6 +40,9 @@ if __name__ == "__main__":
     if options.clean and os.access('stage', os.F_OK):
         shutil.rmtree('stage')
     
+    if not os.access("logs", os.F_OK):
+        os.makedirs("logs")
+
     print "Building packages"
 
     if options.dryrun:
@@ -53,14 +56,11 @@ if __name__ == "__main__":
         res = os.system(find_command("package-build") + " --dest %s %s > logs/build-%s.log 2>&1"%
                         (os.path.abspath('stage'), package, package))
         if res != 0:
-            print >> sys.stderr, "build failed - see logs/build-%s.log"% (package, package)
+            print >> sys.stderr, "build failed - see logs/build-%s.log"% (package)
             sys.exit(1)
 
     stage_gems_dir = os.path.join("stage", "rubygems", "gems")
     dist_gems_dir = os.path.join(destination, "rubygems", "gems")
-
-    if not os.access("logs", os.F_OK):
-        os.makedirs("logs")
 
     if not os.access(dist_gems_dir, os.F_OK):
         os.makedirs(dist_gems_dir)
@@ -68,6 +68,8 @@ if __name__ == "__main__":
     ensure_rubygems_installed(destination)
     ensure_gem_installed('rake', destination)
     ensure_gem_installed('builder', destination)
+
+    os.chdir(repos)
 
     print "Signing gems"
     for gem_file in glob.glob(os.path.join(stage_gems_dir, '*.gem')):

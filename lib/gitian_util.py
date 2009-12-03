@@ -209,5 +209,6 @@ Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
 """%(gemhome, gemhome)
         gemrc_f.close()
     os.environ['GEM_HOME'] = gemhome
+    os.environ['PATH'] = os.path.join(gemhome, "bin") + ":" + os.environ['PATH']
     os.environ['RUBYLIB'] = os.path.join(gemhome, "lib")
 

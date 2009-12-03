@@ -4,6 +4,7 @@ import subprocess
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(sys.argv[0]), "../lib"))
+sys.path.append('/usr/lib/gitian')
 from gitian_util import *
 
 def check_command(command):

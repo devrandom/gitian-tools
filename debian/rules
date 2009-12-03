@@ -56,7 +56,9 @@ binary-indep: install
 	dh_testroot
 	
 	$(install_dir) $(CURDIR)/debian/gitian/usr/lib/gitian
-	$(install_file) lib/gitian-package-build lib/gitian-gem-signer lib/gitian-package-new lib/gitian-release-upload lib/gitian-release-build $(CURDIR)/debian/gitian/usr/lib/gitian
+	$(install_script) lib/gitian-package-build lib/gitian-package-new lib/gitian-release-upload lib/gitian-release-build $(CURDIR)/debian/gitian/usr/lib/gitian
+	$(install_script) lib/gitian-gem-signer lib/collect-gem-dependencies $(CURDIR)/debian/gitian/usr/lib/gitian
+	$(install_file) lib/*.py $(CURDIR)/debian/gitian/usr/lib/gitian
 	
 	$(install_dir) $(CURDIR)/debian/gitian/usr/bin
 	$(install_file) bin/gitian $(CURDIR)/debian/gitian/usr/bin

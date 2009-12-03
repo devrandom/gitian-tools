@@ -2,6 +2,29 @@
 
 require 'rubygems'
 require 'rubygems/package'
+require 'time'
+
+# Ensure that hashes (if any) output in a deterministic way.
+# This assumes that keys are all comparable and of same type -
+# i.e. will fail with symbols.
+# Gem specs usually don't have any hashes, so this is just in case.
+
+class Hash
+    def to_yaml( opts = {} )
+        YAML::quick_emit( self, opts ) do |out|
+            out.map( taguri, to_yaml_style ) do |map|
+                keys.sort.each do |k|
+                    map.add( k, self[k] )
+                end
+            end
+        end
+    end
+end
+
+# Allow access to the gzip IO
+class Gem::Package::TarWriter
+  attr_reader :io
+end
 
 file = $*[0]
 outfile = $*[1]
@@ -20,8 +43,16 @@ File.open(outfile, "wb") do |out_f|
   File.open(file, "rb") do |in_f|
     Gem::Package.open(out_f, "w", signer) do |out_pkg|
       Gem::Package.open(in_f, "r") do |in_pkg|
+        # Set the time to a deterministic value
 	spec = in_pkg.metadata
+        out_pkg.io.mtime = spec.date.to_i
 	spec.cert_chain = signer.cert_chain.map { |cert| cert.to_s }
+        # Make specs deterministic by sorting anything that might be
+        # reordered.  Specs should be identical other than the cert_chain.
+        spec.files = spec.files.sort
+        spec.test_files = spec.test_files.sort
+        spec.extra_rdoc_files = spec.extra_rdoc_files.sort
+        spec.executables = spec.executables.sort
 	out_pkg.metadata = spec.to_yaml
 	in_pkg.each do |entry|
 	  out_pkg.add_file_simple entry.full_name, entry.header.mode, entry.header.size do |tar_io|
