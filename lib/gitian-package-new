@@ -14,8 +14,8 @@ if __name__ == "__main__":
     parser.prog = "gitian package-build"
     parser.add_option ("-c", "--commit",
                        dest="commit",
-                       help="Git commit (defaults to master head)")
-    parser.usage = """gitian package-new [-c COMMIT] REPOS-URL [NAME]
+                       help="Git commit (if a github URL is not specified)")
+    parser.usage = """gitian package-new -c COMMIT REPOS-URL [NAME]
 or:
     gitian package-new GITHUB-COMMIT-URL [NAME]
   Creates a package within a Gitian repository
@@ -43,6 +43,12 @@ or:
             exit(1)
         url = "git://github.com/%s/%s.git"%(match.group(1), match.group(2))
         commit = match.group(3)
+    else:
+        commit = options.commit
+
+    if not commit:
+        parser.error("must specify a commit")
+        exit(1)
 
     if name is None:
         match = re.match('.*/([^/.]+?)(.git)?\Z', url)
@@ -55,19 +61,20 @@ or:
     repos = repository_root()
     path = os.path.join(repos, "packages", name)
 
-    if os.access(path, os.F_OK):
-        print >> sys.stderr, "already exists"
-        exit(1)
+    created = False
 
-    os.makedirs(path)
-    f = open(os.path.join(path, "control"), "w")
-    f.write("""--- 
+    control = os.path.join(path, "control")
+    if not os.access(control, os.F_OK):
+        created = True
+        os.makedirs(path)
+        f = open(control, "w")
+        f.write("""--- 
 name: "%s"
 packager: rubygems
 packager_options:
   build_cmd: "rake -rlocal_rubygems gem"
 """ % (name))
-    f.close()
+        f.close()
 
     f = open(os.path.join(path, name + ".vcptr"), "w")
     f.write("""---
@@ -76,4 +83,12 @@ packager_options:
 """ % (url, commit))
     f.close()
 
-    print "created %s" %(name)
+    (package_dir, control, ptr) = open_package(name)
+    os.chdir(package_dir)
+
+    prepare_build_package(ptr, True)
+
+    if created:
+        print "created %s" %(name)
+    else:
+        print "updated %s" %(name)

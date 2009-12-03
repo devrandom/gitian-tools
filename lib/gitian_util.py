@@ -5,22 +5,37 @@ import shutil
 import fnmatch
 from optparse import SUPPRESS_HELP
 
-def prepare_build_package(control, ptr):
+def prepare_build_package(ptr, do_clean = False):
     if not os.access("build", os.F_OK):
-        res = os.system("git clone --no-checkout '%s' build" % (ptr['url']))
+        os.mkdirs("build")
+        res = os.system("cd build && git init")
         if res != 0:
-            print >> sys.stderr, "git clone failed"
+            print >> sys.stderr, "git init failed"
             sys.exit(1)
 
-        res = os.system("cd build && git reset --hard '%s'" % (ptr['commit']))
+        do_clean = True
+
+    if do_clean:
+        os.system("cd build && git remote rm origin")
+        res = os.system("cd build && git remote add origin '%s'" % (ptr['url']))
         if res != 0:
-            print >> sys.stderr, "git reset failed"
+            print >> sys.stderr, "git remote add failed"
             sys.exit(1)
 
-    res = os.system("cd build && git clean -d -f -x")
-    if res != 0:
-        print >> sys.stderr, "git clean failed"
-        sys.exit(1)
+        res = os.system("cd build && git fetch origin")
+        if res != 0:
+            print >> sys.stderr, "git fetch failed"
+            sys.exit(1)
+
+        res = os.system("cd build && git checkout -f '%s'" % (ptr['commit']))
+        if res != 0:
+            print >> sys.stderr, "git checkout failed"
+            sys.exit(1)
+
+        res = os.system("cd build && git clean -d -f -x")
+        if res != 0:
+            print >> sys.stderr, "git clean failed"
+            sys.exit(1)
 
 def open_package(name):
     repos = repository_root()
@@ -93,12 +108,12 @@ def find_command(command):
     print>>sys.stderr, "installation problem - could not find subcommand %s"%(command)
     exit(1)
 
-def build_gem(package_dir, control, ptr, destination, do_copy=False):
+def build_gem(package_dir, control, ptr, destination, do_copy=False, do_clean=False):
     name = control['name']
 
     os.chdir(package_dir)
 
-    prepare_build_package(control, ptr)
+    prepare_build_package(ptr, do_clean)
 
     packager_options = control.get('packager_options', {}) or {}
 
@@ -183,7 +198,7 @@ def ensure_rubygems_installed(dest):
         (package_dir, control, ptr) = open_package("rubygems")
         os.chdir(package_dir)
 
-        prepare_build_package(control, ptr)
+        prepare_build_package(ptr)
         res = os.system("cd build && ruby setup.rb --no-ri --no-rdoc --prefix=%s" % (gemhome))
         if res != 0 or not os.access(os.path.join(gemhome, "bin", "gem1.8"), os.F_OK):
             print >>sys.stderr, "build failed in %s" % (dir)
