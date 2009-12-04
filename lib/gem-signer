@@ -1,0 +1,148 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'rubygems/package'
+require 'digest/sha2'
+require 'time'
+require 'ostruct'
+require 'optparse'
+
+# Ensure that hashes (if any) output in a deterministic way.
+# This assumes that keys are all comparable and of same type -
+# i.e. will fail with symbols.
+# Gem specs usually don't have any hashes, so this is just in case.
+
+class Hash
+    def to_yaml( opts = {} )
+        YAML::quick_emit( self, opts ) do |out|
+            out.map( taguri, to_yaml_style ) do |map|
+                keys.sort.each do |k|
+                    map.add( k, self[k] )
+                end
+            end
+        end
+    end
+end
+
+# Allow access to the gzip IO
+class Gem::Package::TarWriter
+  attr_reader :io
+end
+
+require 'optparse'
+
+options = OpenStruct.new
+options.key = "cert/gem-private_key.pem"
+options.cert = "cert/gem-public_cert.pem"
+options.digest_file = nil
+options.check_digest = true
+options.quiet = false
+
+opts = OptionParser.new do |opts|
+  opts.banner = "Usage: gem-signer [options] IN_GEM OUT_GEM"
+
+  opts.on("-q", "--quiet", "Be less verbose about digest mismatch") do |flag|
+    options.quiet = flag
+  end
+
+  opts.on("-n", "--[no-]digest-check", "Check that digest did not change (default on)") do |flag|
+    options.check_digest = flag
+  end
+
+  opts.on("-d", "--digest-output FILE", "put gem digest in FILE") do |out|
+    options.digest_file = out
+  end
+
+  opts.on("-c", "--cert-file FILE[,FILE]*", "public cert chain in FILE(s) (default to #{options.cert})") do |file|
+    options.cert = file
+  end
+
+  opts.on("-k", "--key-file FILE", "private key in FILE (default to #{options.key})") do |file|
+    options.key = file
+  end
+
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+end
+
+opts.parse!
+
+file = $*[0]
+outfile = $*[1]
+
+unless file && outfile
+  $stderr.puts opts
+  exit(1)
+end
+
+signer = Gem::Security::Signer.new options.key, options.cert.split(',')
+digest = Digest::SHA2.new(256)
+
+File.open(outfile, "wb") do |out_f|
+  File.open(file, "rb") do |in_f|
+    Gem::Package.open(out_f, "w", signer) do |out_pkg|
+      Gem::Package.open(in_f, "r") do |in_pkg|
+        # Set the time to a deterministic value
+	spec = in_pkg.metadata
+        out_pkg.io.mtime = spec.date.to_i
+	spec.cert_chain = signer.cert_chain.map { |cert| cert.to_s }
+
+        # Make specs deterministic by sorting anything that might be
+        # reordered.  Specs should be identical other than the cert_chain.
+        spec.files = spec.files.sort
+        spec.test_files = spec.test_files.sort
+        spec.extra_rdoc_files = spec.extra_rdoc_files.sort
+        spec.executables = spec.executables.sort
+	out_pkg.metadata = spec.to_yaml
+        spec.cert_chain = []
+        digest.update(spec.to_yaml)
+
+        entries = {}
+        # FIXME should not read everything into memory
+	in_pkg.each do |entry|
+          content = entry.read
+          entries[entry.full_name] = [ entry, content ]
+        end
+
+        # Sort entries to make data tar deterministic
+        entries.keys.sort.each do |key|
+          entry = entries[key][0]
+          content = entries[key][1]
+	  out_pkg.add_file_simple entry.full_name, entry.header.mode, entry.header.size do |tar_io|
+            digest.update(entry.header.size.to_s)
+            digest.update("\001")
+            digest.update(entry.full_name)
+            digest.update("\000")
+            digest.update(entry.header.mode.to_s)
+            unless content.nil?
+              digest.update(content)
+              tar_io.write content unless content.nil?
+            end
+	  end
+	end
+      end
+    end
+  end
+end
+
+digest_out = digest.hexdigest
+
+if options.digest_file
+  if options.check_digest && File.exists?(options.digest_file)
+    File::open(options.digest_file, "r") do |io|
+      digest_in = io.read.chomp
+      if digest_in != digest_out
+        $stderr.puts("digest mismatch:\n" + 
+                     " #{digest_out} !=\n #{digest_in}") unless options.quiet
+        exit(1)
+      end
+    end
+  end
+  File::open(options.digest_file, "w") do |io|
+    io.puts(digest.hexdigest)
+  end
+else
+  puts digest.hexdigest
+end

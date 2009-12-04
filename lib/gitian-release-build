@@ -75,8 +75,12 @@ if __name__ == "__main__":
             print >> sys.stderr, "FAILED - see logs/build-%s.log"% (package)
             failures += 1
 
+    digest_dir = os.path.join("digests", "default")
     stage_gems_dir = os.path.join("stage", "rubygems", "gems")
     dist_gems_dir = os.path.join(destination, "rubygems", "gems")
+
+    if not os.access(digest_dir, os.F_OK):
+        os.makedirs(digest_dir)
 
     if not os.access(dist_gems_dir, os.F_OK):
         os.makedirs(dist_gems_dir)
@@ -94,10 +98,10 @@ if __name__ == "__main__":
     print "Signing gems"
     for gem_file in glob.glob(os.path.join(stage_gems_dir, '*.gem')):
         new_file = os.path.join(dist_gems_dir, os.path.basename(gem_file))
-        res = os.system(find_command("gem-signer") + ' "%s" "%s"'%(gem_file, new_file))
+        digest_file = os.path.join(digest_dir, os.path.basename(gem_file)+".digest")
+        res = os.system(find_command("gem-signer") + ' --digest-output %s --quiet "%s" "%s"'%(digest_file, gem_file, new_file))
         if res != 0:
-            print >> sys.stderr, "gem signing failed for %s"%(gem_file)
-            sys.exit(1)
+            print >> sys.stderr, "FAILED %s"%(gem_file)
 
     print "Indexing gems"
     res = os.system("gem generate_index --directory dist/rubygems > logs/generate_index.log")

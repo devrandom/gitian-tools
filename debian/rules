@@ -57,7 +57,7 @@ binary-indep: install
 	
 	$(install_dir) $(CURDIR)/debian/gitian/usr/lib/gitian
 	$(install_script) lib/gitian-package-build lib/gitian-package-new lib/gitian-release-upload lib/gitian-release-build $(CURDIR)/debian/gitian/usr/lib/gitian
-	$(install_script) lib/gitian-gem-signer lib/collect-gem-dependencies $(CURDIR)/debian/gitian/usr/lib/gitian
+	$(install_script) lib/gem-signer lib/collect-gem-dependencies $(CURDIR)/debian/gitian/usr/lib/gitian
 	$(install_file) lib/*.py $(CURDIR)/debian/gitian/usr/lib/gitian
 	
 	$(install_dir) $(CURDIR)/debian/gitian/usr/bin
