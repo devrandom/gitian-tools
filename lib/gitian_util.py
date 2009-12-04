@@ -227,6 +227,6 @@ Gem.use_paths(ENV['GEM_HOME'], [ENV['GEM_HOME']])
     os.environ['RUBYLIB'] = os.path.join(gemhome, "lib")
     os.environ['RAKE_CMD'] = "rake -rlocal_rubygems"
     os.environ['RAKE_ARGS'] = "-rlocal_rubygems"
-    os.environ['GEM_CMD'] = "gem --config-file=%s"%(gemrc)
+    os.environ['GEM_CMD'] = "gem1.8 --config-file=%s"%(gemrc)
     os.environ['GEM_ARGS'] = "--config-file=%s"%(gemrc)
 

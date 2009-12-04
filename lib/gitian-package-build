@@ -16,6 +16,9 @@ if __name__ == "__main__":
     parser.add_option ("-c", "--clean", default=False, action="store_true",
                        dest="clean",
                        help="Start from a pristine checkout")
+    parser.add_option ("-n", "--dry-run", default=False, action="store_true",
+                       dest="dryrun",
+                       help="Do not actually build - useful when cleaning")
     parser.add_option ("-b", "--blankslate", default=False, action="store_true",
                        dest="blankslate",
                        help="Clean out all installed gems before attempting build")
@@ -30,7 +33,7 @@ or:
     (options, args) = parser.parse_args()
     if not args:
         parser.error("must supply package name")
-        exit(1)
+        sys.exit(1)
 
     repos = repository_root()
 
@@ -41,6 +44,9 @@ or:
 
     name = args[0]
     (package_dir, control, ptr) = open_package(name)
+
+    if options.dryrun:
+        sys.exit(0)
 
     if control['packager'] == 'rubygems':
         if options.blankslate:

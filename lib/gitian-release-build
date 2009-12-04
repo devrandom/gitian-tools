@@ -36,6 +36,13 @@ if __name__ == "__main__":
     if not os.access("gitian-repos", os.F_OK):
         print >> sys.stderr, "must be run within the gitian repository"
         exit(1)
+
+    repos_f = open("gitian-repos", "r")
+    gitian_repos = yaml.load(repos_f)
+    repos_f.close()
+
+    reference_date = gitian_repos['date']
+    reference_date_str = reference_date.strftime("%Y-%m-%d %H:%M:%S +00:00")
     
     if options.blankslate and os.access('dist', os.F_OK):
         shutil.rmtree('dist')
@@ -99,7 +106,7 @@ if __name__ == "__main__":
     for gem_file in glob.glob(os.path.join(stage_gems_dir, '*.gem')):
         new_file = os.path.join(dist_gems_dir, os.path.basename(gem_file))
         digest_file = os.path.join(digest_dir, os.path.basename(gem_file)+".digest")
-        res = os.system(find_command("gem-signer") + ' --digest-output %s --quiet "%s" "%s"'%(digest_file, gem_file, new_file))
+        res = os.system(find_command("gem-signer") + ' --date "%s" --digest-output %s --quiet "%s" "%s"'%(reference_date_str, digest_file, gem_file, new_file))
         if res != 0:
             print >> sys.stderr, "FAILED %s"%(gem_file)
 
