@@ -13,6 +13,16 @@ from gitian_util import *
 from optparse import OptionParser
 #from gettext import gettext as _
 
+def push_repo(rsync_flags, url, release_url):
+    res = os.system("rsync -a%s --chmod=go=rX --delete-after dist/rubygems/ %s"%(rsync_flags, release_url))
+    if res != 0:
+        print >>sys.stderr, "rsync failed, abort"
+        sys.exit(1)
+    res = os.system("rsync -a%s --chmod=go=rX --copy-links cert/gem-public_cert.pem %s"%(rsync_flags, url))
+    if res != 0:
+        print >>sys.stderr, "rsync failed, abort"
+        sys.exit(1)
+
 if __name__ == "__main__":
   parser = OptionParser()
   parser.prog = "gitian release-upload"
@@ -31,6 +41,7 @@ if __name__ == "__main__":
       help="Target release, defaults to 'dev' unless at a signed git tag")
   parser.usage = """%prog [options] CMD
   where CMD is:
+    help - show more help
     push - release to distribution
     delete - delete a release
     list - list releases
@@ -45,15 +56,14 @@ if __name__ == "__main__":
 
   if cmd == "help":
       parser.print_help()
-      exit(1)
+      sys.exit(1)
 
-  if not os.access("gitian-repos", os.F_OK):
-    print >> sys.stderr, "must be run within the gitian repository"
-    exit(1)
+  repos = repository_root()
+  os.chdir(repos)
 
   if not os.access("dist/rubygems/gems", os.F_OK):
-    print >> sys.stderr, "dist/rubygems/gems directory does not exist"
-    exit(1)
+      print >> sys.stderr, "dist/rubygems/gems directory does not exist"
+      sys.exit(1)
 
   try:
       rc_f = open(".gitianrc")
@@ -67,8 +77,8 @@ if __name__ == "__main__":
   if url is None:
       url = rc.get("push_url")
       if url is None:
-          print >> sys.stderr, "no URL saved in .gitianrc"
-          exit(1)
+          parser.error("no URL saved in .gitianrc, please supply with --url")
+          sys.exit(1)
   else:
       rc["push_url"] = url
       rc_f = open(".gitianrc", "w")
@@ -83,7 +93,7 @@ if __name__ == "__main__":
       if status != 0:
           print output
           print >> sys.stderr, "'git describe' failed, do you have a signed tag"
-          exit(1)
+          sys.exit(1)
       match = re.match('\Av(\d+.\d+.\d+)\Z', output)
       if match is None:
           release = 'dev'
@@ -97,28 +107,38 @@ if __name__ == "__main__":
   if options.dryrun: rsync_flags += 'n'
 
   if cmd == "push":
-      os.system("rsync -a%s --delete-after dist/rubygems/ %s"%(rsync_flags, release_url))
+      push_repo(rsync_flags, url, release_url)
   elif cmd == "delete":
       if release == 'dev':
           print >> sys.stderr, "cannot delete since release is 'dev'"
-          exit(1)
+          sys.exit(1)
       t_dir = tempfile.mkdtemp('gitian')
+      res = 1
       try:
-          os.system("rsync -a%s --delete %s/ %s"%(rsync_flags, t_dir, release_url))
+          res = os.system("rsync -a%s --delete %s/ %s"%(rsync_flags, t_dir, release_url))
       finally:
           shutil.rmtree(t_dir)
+          if res != 0:
+              print >>sys.stderr, "rsync failed, abort"
+              sys.exit(1)
+      print "deleted contents of %s"%(release_url)
+
   elif cmd == "release":
       if release == 'dev':
           print >> sys.stderr, "cannot release when current release is 'dev'.  Must be at a git signed release tag."
-          exit(1)
-      os.system("rsync -a%s --delete-after dist/rubygems/ %s"%(rsync_flags, release_url))
+          sys.exit(1)
+      push_repo(rsync_flags, url, release_url)
       t_dir = tempfile.mkdtemp('gitian')
+      res = 1
       try:
           latest = os.path.join(t_dir, "latest")
           os.symlink(release, latest)
-          os.system("rsync -a%s %s %s"%(rsync_flags, latest, url))
+          res = os.system("rsync -a%s %s %s"%(rsync_flags, latest, url))
       finally:
           shutil.rmtree(t_dir)
+          if res != 0:
+              print >>sys.stderr, "rsync failed, abort"
+              sys.exit(1)
 
   elif cmd == "list":
       os.system("rsync --dirs %s/"%(url))
