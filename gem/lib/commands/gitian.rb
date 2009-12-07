@@ -44,7 +44,6 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
   end
 
   def execute
-    say "Thanks for using Gitian!"
     gitian(options[:insecure], options[:release])
     show_status
   end
@@ -76,11 +75,19 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
     sources.unshift url
     Gem.sources = sources
 
+    uri = URI.parse(url)
+    if uri.relative?
+      $stderr.puts "URL must be absolute - i.e. start with http://, https://, file:///"
+      $stderr.puts ""
+      show_help()
+      exit(1)
+    end
+
     Gem.configuration["gitian_source"] = url
 
-    Gem.configuration.write
+    get_cert(uri, options[:re_get_cert])
 
-    get_cert(url, options[:re_get_cert])
+    Gem.configuration.write
 
     if options[:insecure]
       say "Insecure mode."
@@ -92,8 +99,7 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
   def show_status
   end
 
-  def get_cert(url, do_force)
-    uri = URI.parse(url)
+  def get_cert(uri, do_force)
     http = Net::HTTP.new(uri.host, uri.port)
     if uri.scheme == 'https'
       http.use_ssl = true
