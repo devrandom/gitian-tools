@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{gitian}
-  s.version = "0.0.1"
+  s.version = "0.0.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 1.3.5") if s.respond_to? :required_rubygems_version=
   s.authors = ["Miron Cuperman"]
-  s.date = %q{2009-12-05}
+  s.date = %q{2009-12-06}
   s.description = %q{Add gitian sub-commands to the gem command}
   s.email = %q{info.deb@nginz.org}
   s.files = [
