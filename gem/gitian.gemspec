@@ -9,8 +9,8 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 1.3.5") if s.respond_to? :required_rubygems_version=
   s.authors = ["Miron Cuperman"]
-  s.date = %q{2009-12-06}
-  s.description = %q{Add gitian sub-commands to the gem command}
+  s.date = %q{2009-12-07}
+  s.description = %q{Add the 'gitian' sub-commands to the gem command}
   s.email = %q{info.deb@nginz.org}
   s.files = [
     "lib/commands/abstract_gitian_command.rb",
@@ -30,8 +30,9 @@ Gem::Specification.new do |s|
 }
   s.rdoc_options = ["--charset=UTF-8"]
   s.require_paths = ["lib"]
+  s.rubyforge_project = %q{gitian-tools}
   s.rubygems_version = %q{1.3.5}
-  s.summary = %q{Use Gitian repository as gem source}
+  s.summary = %q{Use a Gitian repository as the rubygems source}
   s.test_files = [
     "spec/spec_helper.rb",
      "spec/commands/gitian_spec.rb"
