@@ -1,0 +1,159 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'zlib'
+require 'json'
+require 'yaml'
+require 'set'
+
+CUTOFF = 200
+
+# Expects a directory with .gemspec.rz and gemcutter .json files
+# 
+# Displays a table with:
+# - Score rank
+# - Score
+# - Score from dependencies
+# - Downloads
+# - Number of gems needed to achieve closure for gems at this and higher rank
+# - Name
+# - Any messages regarding missing dependencies
+#
+#
+
+def load_entries(dir)
+  entries = []
+  problems = 0
+  Dir.new(dir).each do |file|
+    if file =~ /\.json$/
+      begin
+	entry = JSON.load(File.read("#{dir}/#{file}"))
+      rescue JSON::ParserError
+	puts "could not parse #{file}"
+      end
+    rzfile = "#{entry['name']}-#{entry['version']}.gemspec.rz"
+    begin
+      spec = Marshal.load(Zlib::Inflate.inflate(File.read("#{dir}/#{rzfile}")))
+      entry[:deps] = spec.dependencies
+    rescue
+      #puts "could not open #{rzfile}"
+      problems += 1
+      next
+    end
+    entries << entry
+    end
+  end
+  puts "could not open #{problems} files"
+
+  entries
+end
+
+if File.exist?('dump.yaml')
+  puts "loading from dump"
+  entries = []
+  File.open("dump.yaml", "r") do |f|
+    YAML.each_document(f) do |entry|
+      entries << entry
+    end
+  end
+else
+  puts "loading from source"
+  entries = load_entries($*[0])
+  File.open("dump.yaml", "w") do |f|
+    entries.each do |entry|
+      YAML.dump(entry, f)
+    end
+  end
+end
+
+all_entries = {}
+
+# Reverse dependency map
+dev_deps = {}
+run_deps = {}
+
+entries.each do |entry|
+  name = entry['name']
+  all_entries[name] = entry
+  entry[:score] = entry['downloads']
+  entry[:depscore] = 0
+  entry[:missing] = nil
+  entry[:deps].each do |dep|
+    dev_deps[dep.name] ||= Set.new
+    run_deps[dep.name] ||= Set.new
+    dev_deps[dep.name] << entry if dep.type == :development
+    run_deps[dep.name] << entry if dep.type == :runtime
+  end
+end
+
+entries.each do |entry|
+  name = entry['name']
+  if dev_deps[name]
+    dev_deps[name].each do |dep|
+      entry[:score] += dep['downloads'] / 10
+      entry[:depscore] += dep['downloads'] / 10
+    end
+    run_deps[name].each do |dep|
+      entry[:score] += dep['downloads'] / 10
+      entry[:depscore] += dep['downloads']
+    end
+  end
+end
+
+# Used to close the set of gems needed to satisfy all
+# dependencies of entries in set.
+class Closure
+  def initialize(all)
+    @set = Hash.new
+    @all = all
+  end
+
+  def <<(entry)
+    return if @set.include?(entry)
+    new_deps = Hash.new
+    new_deps[entry['name']] = entry
+
+    while (!new_deps.empty?)
+      deps = new_deps
+      new_deps = Hash.new
+      deps.each_value do |dep|
+	dep_name = dep['name']
+	unless @set.has_key?(dep_name) || new_deps.has_key?(dep_name)
+	  @set[dep_name] = dep
+	  dep[:deps].each do |subdep|
+	    subdep_entry = @all[subdep.name]
+	    if subdep_entry
+	      new_deps[subdep.name] = subdep_entry
+	    else
+	      if subdep.type == :runtime
+		entry[:missing] ||= 'MISSING: '
+		entry[:missing] += subdep.name + "? "
+	      end
+	    end
+	  end
+	end
+      end
+    end
+  end
+
+  def size()
+    @set.size()
+  end
+
+  def set()
+    @set
+  end
+end
+
+closure = Closure.new(all_entries)
+
+entries = entries.sort_by { |e| -e[:score] }
+puts sprintf("%4s %9s %9s %9s %9s name", "rank", "score", "depscore", "downloads", "closure", "name")
+
+index = 0
+entries.each do |e|
+  index += 1
+  break if e[:score] < CUTOFF
+  closure << e
+  puts sprintf("%4d %9d %9d %9d %9d %s %s", index, e[:score].to_s, e[:depscore], e['downloads'], closure.size(), e['name'], e[:missing])
+end
