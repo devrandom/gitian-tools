@@ -108,13 +108,19 @@ File.open(outfile, "wb") do |out_f|
         digest.update(spec.to_yaml)
 
         entries = {}
+
         # FIXME should not read everything into memory
 	in_pkg.each do |entry|
           content = entry.read
+
+	  # Skip any gemspecs in the data part, they are not needed
+	  # and their date can change
+	  next if entry.full_name =~ /.gemspec$/
+
           entries[entry.full_name] = [ entry, content ]
         end
 
-        # Sort entries to make data tar deterministic
+        # Sort entries to make data part deterministic
         entries.keys.sort.each do |key|
           entry = entries[key][0]
           content = entries[key][1]
@@ -125,7 +131,7 @@ File.open(outfile, "wb") do |out_f|
             digest.update("\000")
             unless content.nil?
               digest.update(content)
-              tar_io.write content unless content.nil?
+              tar_io.write content
             end
 	  end
 	end

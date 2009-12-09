@@ -5,21 +5,46 @@ require 'zlib'
 require 'json'
 require 'yaml'
 require 'set'
+require 'optparse'
+require 'ostruct'
 
-CUTOFF = 200
+options = OpenStruct.new
+options.cutoff = 100
+options.yaml = false
 
-# Expects a directory with .gemspec.rz and gemcutter .json files
-# 
-# Displays a table with:
-# - Score rank
-# - Score
-# - Score from dependencies
-# - Downloads
-# - Number of gems needed to achieve closure for gems at this and higher rank
-# - Name
-# - Any messages regarding missing dependencies
-#
-#
+opts = OptionParser.new do |opts|
+  opts.banner = <<-EOF
+Usage: gem-stats DIR
+Expects a directory with <gem>-<ver>.gemspec.rz and gemcutter <gem>.json files
+Displays a table with:
+* Score rank
+* Score
+* Score from dependencies
+* Downloads
+* Number of gems needed to achieve closure for gems at this and higher rank
+* Name
+* Any messages regarding missing dependencies
+
+  EOF
+  opts.on("-c", "--cutoff CUTOFF", "Score cutoff") do |cutoff|
+    options.cutoff = cutoff
+  end
+  opts.on("-y", "--yaml", "Output YAML to stats.yaml instead of text") do |yaml|
+    options.yaml = yaml
+  end
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+end
+
+opts.parse!
+
+unless $*[0]
+  $stderr.puts opts
+  exit(1)
+end
+
 
 def load_entries(dir)
   entries = []
@@ -109,7 +134,9 @@ class Closure
   end
 
   def <<(entry)
-    return if @set.include?(entry)
+    added_deps = Set.new
+
+    return added_deps if @set.has_key?(entry['name'])
     new_deps = Hash.new
     new_deps[entry['name']] = entry
 
@@ -120,6 +147,7 @@ class Closure
 	dep_name = dep['name']
 	unless @set.has_key?(dep_name) || new_deps.has_key?(dep_name)
 	  @set[dep_name] = dep
+	  added_deps << dep
 	  dep[:deps].each do |subdep|
 	    subdep_entry = @all[subdep.name]
 	    if subdep_entry
@@ -134,6 +162,7 @@ class Closure
 	end
       end
     end
+    return added_deps
   end
 
   def size()
@@ -148,12 +177,24 @@ end
 closure = Closure.new(all_entries)
 
 entries = entries.sort_by { |e| -e[:score] }
-puts sprintf("%4s %9s %9s %9s %9s name", "rank", "score", "depscore", "downloads", "closure", "name")
 
-index = 0
-entries.each do |e|
-  index += 1
-  break if e[:score] < CUTOFF
-  closure << e
-  puts sprintf("%4d %9d %9d %9d %9d %s %s", index, e[:score].to_s, e[:depscore], e['downloads'], closure.size(), e['name'], e[:missing])
+if options.yaml
+  File.open("stats.yaml", "w") do |outf|
+    entries.each do |entry|
+      break if entry[:score] < options.cutoff
+      adds = (closure << entry)
+      entry[:closure_adds] = adds.map { |d| d['name'] }
+      YAML.dump(entry, outf)
+    end
+  end
+else
+  puts sprintf("%4s %9s %9s %9s %9s name", "rank", "score", "depscore", "downloads", "closure", "name")
+
+  index = 0
+  entries.each do |e|
+    index += 1
+    break if e[:score] < options.cutoff
+    closure << e
+    puts sprintf("%4d %9d %9d %9d %9d %s %s", index, e[:score].to_s, e[:depscore], e['downloads'], closure.size(), e['name'], e[:missing])
+  end
 end
