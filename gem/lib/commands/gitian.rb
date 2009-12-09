@@ -20,10 +20,11 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
     super 'gitian', description
 
     defaults.merge!(
-      :insecure => false,
-      :release => 'latest',
+      :undo => false,
+      :release => nil,
       :gitian => false,
-      :re_get_cert => false
+      :re_get_cert => false,
+      :status => false
     )
 
     add_option('-r', '--release REL', 'Specify a release (default is "latest")') do |value, options|
@@ -38,42 +39,72 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
       options[:re_get_cert] = true
     end
 
-    add_option('', '--insecure', 'Do not require signatures on gems') do |value, options|
-      options[:insecure] = true
+    add_option('-u', '--undo', 'Disable gitian (so that you can install from an insecure repository)') do |value, options|
+      options[:undo] = true
+    end
+    add_option('-s', '--status', 'Show status') do |value, options|
+      options[:status] = true
     end
   end
 
   def execute
-    gitian(options[:insecure], options[:release])
+    if options[:undo]
+      undo()
+    elsif options[:status]
+    else
+      gitian(options[:gitian], options[:release])
+    end
     show_status
   end
 
-  def gitian(insecure, release)
+  def undo
+    unless Gem.configuration["saved_srcs"]
+      puts "There is no saved configuration"
+      return
+    end
+
+    gem_opts = Gem.configuration["gem"] || ""
+    gem_opts.gsub!(/\s*--trust-policy[ =]\S+/, "")
+    Gem.configuration["gem"] = gem_opts.strip
+    Gem.sources = Gem.configuration["saved_srcs"]
+    Gem.configuration["saved_srcs"] = nil
+
+    Gem.configuration.write
+  end
+
+  def gitian(use_gitian, release)
     gem_opts = Gem.configuration["gem"] || ""
     gem_opts.gsub!(/\s*--trust-policy[ =]\S+/, "")
     policy = "HighSecurity"
-    policy = "MediumSecurity" if insecure
     gem_opts = gem_opts + " --trust-policy #{policy}"
     Gem.configuration["gem"] = gem_opts.strip
     oldurl = Gem.configuration["gitian_source"]
 
     url = get_one_optional_argument
-    if url.nil?
-      if options[:gitian] || oldurl.nil?
+    if url
+      release ||= 'latest'
+    else
+      if use_gitian || oldurl.nil?
 	url = URL
+	release ||= 'latest'
       else
-	url = URI.parse(oldurl).merge("..").to_s
+	# if using old URL, strip last component only if release given
+	url = oldurl
+	url = URI.parse(url).merge("..").to_s if release
       end
     end
 
     url += "/" if url[-1,1] != "/"
-    url = url + release
-    url += "/" if url[-1,1] != "/"
+    url = url + release + "/" if release
 
     sources = Gem.sources
     sources.reject! { |s| s == url || s == oldurl }
-    sources.unshift url
+    if !sources.empty?
+      Gem.configuration["saved_srcs"] = sources
+    end
+    sources = [ url ]
     Gem.sources = sources
+    Gem.configuration["gitian_source"] = url
 
     uri = URI.parse(url)
     if uri.relative?
@@ -83,20 +114,19 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
       exit(1)
     end
 
-    Gem.configuration["gitian_source"] = url
-
     get_cert(uri, options[:re_get_cert])
 
     Gem.configuration.write
 
-    if options[:insecure]
-      say "Insecure mode."
-    else
-      say "High security enabled.  You will get an 'unsigned gem' error if you try to install a gem from a normal, non-signing gem repository."
-    end
+    say "High security policy enabled.  You will get an 'unsigned gem' error if you try to install a gem from a normal, non-signing gem repository.  Use 'gem gitian --undo' if you want to install an unsigned gem."
   end
 
   def show_status
+    puts "Sources in ~/.gemrc:"
+    Gem.sources.each do |source|
+      puts "- #{source}"
+    end
+    puts "Gem defaults: #{Gem.configuration["gem"]}" if Gem.configuration["gem"] && Gem.configuration["gem"] != ""
   end
 
   def get_cert(uri, do_force)
