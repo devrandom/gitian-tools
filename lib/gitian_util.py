@@ -151,11 +151,16 @@ def build_gem(package_dir, control, ptr, destination, do_copy=False, do_clean=Fa
 def copy_gems_to_dist(subdir, destination):
     print "installing to %s"%(destination)
     gems_destination = os.path.join(destination, "rubygems/gems")
+    found = False
     for dirpath, dirs, files in os.walk(subdir):
-        for file in fnmatch.filter(files, '*-*.*.*.gem'):
+        for file in fnmatch.filter(files, '*-*.*.gem'):
             if not os.access(gems_destination, os.F_OK):
                 os.makedirs(gems_destination)
             shutil.copy(os.path.join(dirpath, file), gems_destination)
+            found = True
+    if not found:
+        print >> sys.stderr, "no gem found"
+        sys.exit(1)
 
 GEM_CHECK_COMMAND = "ruby -rlocal_rubygems -e 'exit(Gem.source_index.find_name(\"%s\").length==0?1:0)'"
 

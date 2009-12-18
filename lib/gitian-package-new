@@ -91,6 +91,14 @@ or:
 
     prepare_build_package(ptr, True)
 
+    # If there's a gemspec, use that instead
+    if created and os.access(os.path.join('build', name + ".gemspec"), os.F_OK):
+        control_f = open(control_path, "w")
+        control['packager_options']['build_cmd'] = "$GEM_CMD build %s.gemspec"%(name)
+        yaml.dump(control, control_f,
+                  default_flow_style=False, explicit_start=True)
+        control_f.close()
+
     if created:
         print "created %s" %(name)
     else:
