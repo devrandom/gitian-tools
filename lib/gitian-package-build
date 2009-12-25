@@ -56,9 +56,10 @@ or:
         ensure_rubygems_installed(destination)
         ensure_gem_installed('rake', destination)
         do_copy = True
-        if name == 'rubygems':
-            do_copy = False
         build_gem(package_dir, control, ptr, destination, do_copy, options.clean)
+    if control['packager'] == 'tar':
+        do_copy = True
+        build_tar(package_dir, control, ptr, destination, do_copy, options.clean)
     else:
         print >> sys.stderr, "unknown packager %s" % (control['packager'])
         

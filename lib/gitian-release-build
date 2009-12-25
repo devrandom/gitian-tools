@@ -84,13 +84,18 @@ if __name__ == "__main__":
 
     digest_dir = os.path.join("digests", "default")
     stage_gems_dir = os.path.join("stage", "rubygems", "gems")
+    stage_tars_dir = os.path.join("stage", "rubygems", "tars")
     dist_gems_dir = os.path.join(destination, "rubygems", "gems")
+    dist_tars_dir = os.path.join(destination, "rubygems", "tars")
 
     if not os.access(digest_dir, os.F_OK):
         os.makedirs(digest_dir)
 
     if not os.access(dist_gems_dir, os.F_OK):
         os.makedirs(dist_gems_dir)
+
+    if not os.access(dist_tars_dir, os.F_OK):
+        os.makedirs(dist_tars_dir)
 
     ensure_rubygems_installed(destination)
     ensure_gem_installed('rake', destination)
@@ -109,6 +114,14 @@ if __name__ == "__main__":
         res = os.system(find_command("gem-signer") + ' --date "%s" --digest-output %s --quiet "%s" "%s"'%(reference_date_str, digest_file, gem_file, new_file))
         if res != 0:
             print >> sys.stderr, "FAILED %s"%(gem_file)
+
+    print "Hashing tars"
+    for tar_file in glob.glob(os.path.join(stage_tars_dir, '*.tar')):
+        new_file = os.path.join(dist_tars_dir, os.path.basename(tar_file))
+        digest_file = os.path.join(digest_dir, os.path.basename(tar_file)+".digest")
+        res = os.system(find_command("tar-signer") + ' --date "%s" --digest-output %s --quiet "%s" "%s"'%(reference_date_str, digest_file, tar_file, new_file))
+        if res != 0:
+            print >> sys.stderr, "FAILED %s"%(tar_file)
 
     print "Indexing gems"
     res = os.system("gem generate_index --directory dist/rubygems > logs/generate_index.log")

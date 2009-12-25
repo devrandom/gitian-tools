@@ -9,9 +9,24 @@ import commands
 import re
 import tempfile
 import shutil
+import glob
+from string import Template
 from gitian_util import *
 from optparse import OptionParser
 #from gettext import gettext as _
+
+def process_static_files(release, rc):
+    static_files_dir = os.path.join("static-files", "rubygems")
+    for static_file in glob.glob(os.path.join(static_files_dir, "*.tpl")):
+        result_base = os.path.basename(static_file)[0:-4]
+        new_file = os.path.join("dist", "rubygems", result_base)
+        in_f = open(static_file, "r")
+        out_f = open(new_file, "w")
+        content = in_f.read()
+        content = Template(content).safe_substitute(PUBLIC_URL = rc["public_url"], RELEASE = release)
+        out_f.write(content)
+        in_f.close()
+        out_f.close()
 
 def push_repo(rsync_flags, url, release_url):
     res = os.system("rsync -a%s --chmod=go=rX --delete-after dist/rubygems/ %s"%(rsync_flags, release_url))
@@ -24,125 +39,143 @@ def push_repo(rsync_flags, url, release_url):
         sys.exit(1)
 
 if __name__ == "__main__":
-  parser = OptionParser()
-  parser.prog = "gitian release-upload"
-  optparser_extend(parser)
-  parser.add_option ("-u", "--url",
-      dest="url",
-      help="Target rsync URL, or previously used URL if omitted")
-  parser.add_option ("-n", "--dry-run", default=False, action="store_true",
-      dest="dryrun",
-      help="Do a dry-run rsync")
-  parser.add_option ("-v", "--verbose", default=False, action="store_true",
-      dest="verbose",
-      help="Make rsync verbose")
-  parser.add_option ("-r", "--release",
-      dest="release",
-      help="Target release, defaults to 'dev' unless at a signed git tag")
-  parser.usage = """%prog [options] CMD
-  where CMD is:
-    help - show more help
-    push - release to distribution
-    delete - delete a release
-    list - list releases
-    release - push, then set the 'latest' release symlink"""
+    parser = OptionParser()
+    parser.prog = "gitian release-upload"
+    optparser_extend(parser)
+    parser.add_option ("-u", "--url",
+        dest="url",
+        help="Target rsync URL, or previously used URL if omitted")
+    parser.add_option ("-p", "--public_url",
+        dest="public_url",
+        help="HTTP/HTTPS URL as seen by public, or previously used URL if omitted")
+    parser.add_option ("-n", "--dry-run", default=False, action="store_true",
+        dest="dryrun",
+        help="Do a dry-run rsync")
+    parser.add_option ("-v", "--verbose", default=False, action="store_true",
+        dest="verbose",
+        help="Make rsync verbose")
+    parser.add_option ("-r", "--release",
+        dest="release",
+        help="Target release, defaults to 'dev' unless at a signed git tag")
+    parser.usage = """%prog [options] CMD
+    where CMD is:
+      help - show more help
+      push - release to distribution
+      delete - delete a release
+      list - list releases
+      release - push, then set the 'latest' release symlink"""
+  
+    (options, args) = parser.parse_args()
+  
+    if len(args) != 1:
+        parser.error("must supply command")
+  
+    cmd = args[0]
+  
+    if cmd == "help":
+        parser.print_help()
+        sys.exit(1)
+  
+    repos = repository_root()
+    os.chdir(repos)
+  
+    if not os.access("dist/rubygems/gems", os.F_OK):
+        print >> sys.stderr, "dist/rubygems/gems directory does not exist"
+        sys.exit(1)
+  
+    try:
+        rc_f = open(".gitianrc")
+        rc = yaml.load(rc_f)
+        rc_f.close()
+    except Exception, e:
+        rc = {}
+  
+    url = options.url
 
-  (options, args) = parser.parse_args()
+    if url is None:
+        url = rc.get("push_url")
+        if url is None:
+            parser.error("no rsync URL saved in .gitianrc, please supply with --url")
+            sys.exit(1)
+    else:
+        rc["push_url"] = url
+        rc_f = open(".gitianrc", "w")
+        yaml.dump(rc, rc_f)
+        rc_f.close()
 
-  if len(args) != 1:
-      parser.error("must supply command")
-
-  cmd = args[0]
-
-  if cmd == "help":
-      parser.print_help()
-      sys.exit(1)
-
-  repos = repository_root()
-  os.chdir(repos)
-
-  if not os.access("dist/rubygems/gems", os.F_OK):
-      print >> sys.stderr, "dist/rubygems/gems directory does not exist"
-      sys.exit(1)
-
-  try:
-      rc_f = open(".gitianrc")
-      rc = yaml.load(rc_f)
-      rc_f.close()
-  except Exception, e:
-      rc = {}
-
-  url = options.url
-
-  if url is None:
-      url = rc.get("push_url")
-      if url is None:
-          parser.error("no URL saved in .gitianrc, please supply with --url")
-          sys.exit(1)
-  else:
-      rc["push_url"] = url
-      rc_f = open(".gitianrc", "w")
-      yaml.dump(rc, rc_f)
-      rc_f.close()
-
-
-  release = options.release 
-  if release is None:
-      # Figure out if at a signed git tag
-      (status, output) = commands.getstatusoutput("git describe")
-      if status != 0:
-          print output
-          print >> sys.stderr, "'git describe' failed, do you have a signed tag"
-          sys.exit(1)
-      match = re.match('\Av(\d+.\d+.\d+)\Z', output)
-      if match is None:
-          release = 'dev'
-      else:
-          release = match.group(1)
-      print "Release: %s"%(release)
-
-  release_url = url + "/" + release
-  rsync_flags = ''
-  if options.verbose: rsync_flags += 'v'
-  if options.dryrun: rsync_flags += 'n'
-
-  if cmd == "push":
-      push_repo(rsync_flags, url, release_url)
-  elif cmd == "delete":
-      if release == 'dev':
-          print >> sys.stderr, "cannot delete since release is 'dev'"
-          sys.exit(1)
-      t_dir = tempfile.mkdtemp('gitian')
-      res = 1
-      try:
-          res = os.system("rsync -a%s --delete %s/ %s"%(rsync_flags, t_dir, release_url))
-      finally:
-          shutil.rmtree(t_dir)
-          if res != 0:
-              print >>sys.stderr, "rsync failed, abort"
+    public_url = options.public_url
+  
+    if public_url is None:
+          public_url = rc.get("public_url")
+          if public_url is None:
+              print>>sys.stderr, "no public url saved in .gitianrc, please supply with --public-url"
               sys.exit(1)
-      print "deleted contents of %s"%(release_url)
+    else:
+        rc["public_url"] = url
+        rc_f = open(".gitianrc", "w")
+        yaml.dump(rc, rc_f)
+        rc_f.close()
 
-  elif cmd == "release":
-      if release == 'dev':
-          print >> sys.stderr, "cannot release when current release is 'dev'.  Must be at a git signed release tag."
-          sys.exit(1)
-      push_repo(rsync_flags, url, release_url)
-      t_dir = tempfile.mkdtemp('gitian')
-      res = 1
-      try:
-          latest = os.path.join(t_dir, "latest")
-          os.symlink(release, latest)
-          res = os.system("rsync -a%s %s %s"%(rsync_flags, latest, url))
-      finally:
-          shutil.rmtree(t_dir)
-          if res != 0:
-              print >>sys.stderr, "rsync failed, abort"
-              sys.exit(1)
 
-  elif cmd == "list":
-      os.system("rsync --dirs %s/"%(url))
-  elif cmd == "help":
-      parser.help()
-  else:
-      parser.error("unknown command")
+    release = options.release 
+    if release is None:
+        # Figure out if at a signed git tag
+        (status, output) = commands.getstatusoutput("git describe")
+        if status != 0:
+            print output
+            print >> sys.stderr, "'git describe' failed, do you have a signed tag"
+            sys.exit(1)
+        match = re.match('\Av(\d+.\d+.\d+)\Z', output)
+        if match is None:
+            release = 'dev'
+        else:
+            release = match.group(1)
+        print "Release: %s"%(release)
+  
+    release_url = url + "/" + release
+    rsync_flags = ''
+    if options.verbose: rsync_flags += 'v'
+    if options.dryrun: rsync_flags += 'n'
+  
+    if cmd == "push":
+        process_static_files(release, rc)
+        push_repo(rsync_flags, url, release_url)
+    elif cmd == "delete":
+        if release == 'dev':
+            print >> sys.stderr, "cannot delete since release is 'dev'"
+            sys.exit(1)
+        t_dir = tempfile.mkdtemp('gitian')
+        res = 1
+        try:
+            res = os.system("rsync -a%s --delete %s/ %s"%(rsync_flags, t_dir, release_url))
+        finally:
+            shutil.rmtree(t_dir)
+            if res != 0:
+                print >>sys.stderr, "rsync failed, abort"
+                sys.exit(1)
+        print "deleted contents of %s"%(release_url)
+  
+    elif cmd == "release":
+        if release == 'dev':
+            print >> sys.stderr, "cannot release when current release is 'dev'.  Must be at a git signed release tag."
+            sys.exit(1)
+        process_static_files(release, rc)
+        push_repo(rsync_flags, url, release_url)
+        t_dir = tempfile.mkdtemp('gitian')
+        res = 1
+        try:
+            latest = os.path.join(t_dir, "latest")
+            os.symlink(release, latest)
+            res = os.system("rsync -a%s %s %s"%(rsync_flags, latest, url))
+        finally:
+            shutil.rmtree(t_dir)
+            if res != 0:
+                print >>sys.stderr, "rsync failed, abort"
+                sys.exit(1)
+  
+    elif cmd == "list":
+        os.system("rsync --dirs %s/"%(url))
+    elif cmd == "help":
+        parser.help()
+    else:
+        parser.error("unknown command")

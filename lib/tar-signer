@@ -1,0 +1,122 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'rubygems/package'
+require 'digest/sha2'
+require 'time'
+require 'ostruct'
+require 'optparse'
+
+# Ensure that hashes (if any) output in a deterministic way.
+# This assumes that keys are all comparable and of same type -
+# i.e. will fail with symbols.
+# Gem specs usually don't have any hashes, so this is just in case.
+
+TAR_ENTRY_MODE = 0600
+TAR_DIR_ENTRY_MODE = 0700
+
+# Allow access to the gzip IO
+class Gem::Package::TarWriter
+  attr_reader :io
+end
+
+require 'optparse'
+
+options = OpenStruct.new
+options.digest_file = nil
+options.check_digest = true
+options.quiet = false
+options.date = "1970-01-01 00:00:00 +00:00"
+
+opts = OptionParser.new do |opts|
+  opts.banner = "Usage: tar-signer [options] IN_TAR OUT_TAR"
+
+  opts.on("-d", "--date DATE", "Reference date, default to 1970-01-01 UTC") do |date|
+    options.date = date
+  end
+
+  opts.on("-q", "--quiet", "Be less verbose about digest mismatch") do |flag|
+    options.quiet = flag
+  end
+
+  opts.on("-n", "--[no-]digest-check", "Check that digest did not change (default on)") do |flag|
+    options.check_digest = flag
+  end
+
+  opts.on("-o", "--digest-output FILE", "put gem digest in FILE") do |out|
+    options.digest_file = out
+  end
+
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+end
+
+opts.parse!
+
+file = $*[0]
+outfile = $*[1]
+
+unless file && outfile
+  $stderr.puts opts
+  exit(1)
+end
+
+digest = Digest::SHA2.new(256)
+
+File.open(outfile, "wb") do |out_f|
+  File.open(file, "rb") do |in_f|
+    Gem::Package::TarReader.new(in_f) do |reader|
+      Gem::Package::TarWriter.new(out_f) do |writer|
+	entries = {}
+
+	# FIXME should not read everything into memory
+	reader.each do |entry|
+	  content = entry.read
+
+	  entries[entry.full_name] = [ entry, content ]
+	end
+
+        # Sort entries to make data part deterministic
+        entries.keys.sort.each do |key|
+          entry = entries[key][0]
+          content = entries[key][1]
+	  if entry.directory?
+	    writer.mkdir entry.full_name, TAR_DIR_ENTRY_MODE
+	  else
+	    writer.add_file_simple entry.full_name, TAR_ENTRY_MODE, entry.header.size do |tar_io|
+	      digest.update(entry.header.size.to_s)
+	      digest.update("\001")
+	      digest.update(entry.full_name)
+	      digest.update("\000")
+	      content = "" if content.nil?
+	      digest.update(content)
+	      tar_io.write content
+	    end
+	  end
+	end
+      end
+    end
+  end
+end
+
+digest_out = digest.hexdigest
+
+if options.digest_file
+  if options.check_digest && File.exists?(options.digest_file)
+    File::open(options.digest_file, "r") do |io|
+      digest_in = io.read.chomp
+      if digest_in != digest_out
+        $stderr.puts("digest mismatch:\n" + 
+                     " #{digest_out} !=\n #{digest_in}") unless options.quiet
+        exit(1)
+      end
+    end
+  end
+  File::open(options.digest_file, "w") do |io|
+    io.puts(digest.hexdigest)
+  end
+else
+  puts digest.hexdigest
+end

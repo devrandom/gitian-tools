@@ -108,6 +108,26 @@ def find_command(command):
     print>>sys.stderr, "installation problem - could not find subcommand %s"%(command)
     exit(1)
 
+def build_tar(package_dir, control, ptr, destination, do_copy=False, do_clean=False):
+    name = control['name']
+
+    os.chdir(package_dir)
+
+    prepare_build_package(ptr, do_clean)
+
+    packager_options = control.get('packager_options', {}) or {}
+
+    build_cmd = packager_options.get('build_cmd', 'rake -t -rlocal_rubygems gem')
+    os.chdir(package_dir)
+
+    print "Building package %s (copy=%s)" % (name, do_copy)
+    res = os.system("cd build && %s" % (build_cmd))
+    if res != 0:
+        print >> sys.stderr, "build failed"
+        sys.exit(1)
+    if do_copy:
+        copy_tars_to_dist("build", destination)
+
 def build_gem(package_dir, control, ptr, destination, do_copy=False, do_clean=False):
     name = control['name']
 
@@ -160,6 +180,20 @@ def copy_gems_to_dist(subdir, destination):
             found = True
     if not found:
         print >> sys.stderr, "no gem found"
+        sys.exit(1)
+
+def copy_tars_to_dist(subdir, destination):
+    print "installing to %s"%(destination)
+    tars_destination = os.path.join(destination, "rubygems/tars")
+    found = False
+    for dirpath, dirs, files in os.walk(subdir):
+        for file in fnmatch.filter(files, '*-*.*.tar'):
+            if not os.access(tars_destination, os.F_OK):
+                os.makedirs(tars_destination)
+            shutil.copy(os.path.join(dirpath, file), tars_destination)
+            found = True
+    if not found:
+        print >> sys.stderr, "no tar found"
         sys.exit(1)
 
 GEM_CHECK_COMMAND = "ruby -rlocal_rubygems -e 'exit(Gem.source_index.find_name(\"%s\").length==0?1:0)'"
