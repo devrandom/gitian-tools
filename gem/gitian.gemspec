@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 1.3.5") if s.respond_to? :required_rubygems_version=
   s.authors = ["Miron Cuperman"]
-  s.date = %q{2009-12-07}
+  s.date = %q{2009-12-26}
   s.description = %q{Add the 'gitian' sub-commands to the gem command}
   s.email = %q{info.deb@nginz.org}
   s.files = [
@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
      "lib/commands/gitian.rb",
      "lib/rubygems_plugin.rb"
   ]
-  s.homepage = %q{http://gitian.org/}
+  s.homepage = %q{https://gitian.org/}
   s.post_install_message = %q{
 ========================================================================
 

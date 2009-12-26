@@ -13,12 +13,12 @@ describe Gem::Commands::GitianCommand do
   it "should set sources if url supplied" do
     @command.should_receive(:get_one_optional_argument).and_return(@new_url)
     Gem.configuration.should_receive(:[]).with("gitian_source").and_return(nil)
-    Gem.configuration.should_receive(:[]=).with("gitian_source", @new_url + "latest")
+    Gem.configuration.should_receive(:[]=).with("gitian_source", @new_url + "latest/")
     Gem.configuration.should_receive(:[]).with("gem").and_return("--no-ri")
     Gem.configuration.should_receive(:[]=).with("gem", "--no-ri --trust-policy HighSecurity")
     Gem.configuration.should_receive(:write)
     Gem.should_receive(:sources).and_return([@url])
-    Gem.should_receive(:sources=).with([@new_url + "latest", @url])
+    Gem.should_receive(:sources=).with([@new_url + "latest/", @url])
     @command.execute
   end
 
@@ -26,9 +26,9 @@ describe Gem::Commands::GitianCommand do
     @command.should_receive(:get_one_optional_argument).and_return(nil)
     Gem.configuration.should_receive(:write)
     Gem.configuration.should_receive(:[]).with("gitian_source").and_return(nil)
-    Gem.configuration.should_receive(:[]=).with("gitian_source", @gitian_url + "latest")
+    Gem.configuration.should_receive(:[]=).with("gitian_source", @gitian_url + "latest/")
     Gem.should_receive(:sources).and_return([@url])
-    Gem.should_receive(:sources=).with([@gitian_url + "latest", @url])
+    Gem.should_receive(:sources=).with([@gitian_url + "latest/", @url])
   end
 
   it "should set sources if url not supplied" do

@@ -10,7 +10,7 @@ begin
     gem.summary = "Use a Gitian repository as the rubygems source"
     gem.description = "Add the 'gitian' sub-commands to the gem command"
     gem.email = "info.deb@nginz.org"
-    gem.homepage = "http://gitian.org/"
+    gem.homepage = "https://gitian.org/"
     gem.authors = ["Miron Cuperman"]
     gem.files = FileList["lib/rubygems_plugin.rb", "lib/commands/*"]
     gem.test_files = FileList["spec/*.rb", "spec/commands/*"]
