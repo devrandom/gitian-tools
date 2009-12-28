@@ -1,0 +1,10 @@
+h1. Roadmap
+
+h2. Milestone A
+
+* Multiple signatories on packages
+
+h2. Milestone B
+
+* Debian fork
+

@@ -122,18 +122,15 @@ class Gem::Commands::GitianCommand < Gem::AbstractGitianCommand
   end
 
   def show_status
-    puts "Sources in ~/.gemrc:"
+    say "Sources in ~/.gemrc:"
     Gem.sources.each do |source|
-      puts "- #{source}"
+      say "- #{source}"
     end
-    puts "Gem defaults: #{Gem.configuration["gem"]}" if Gem.configuration["gem"] && Gem.configuration["gem"] != ""
+    say "Gem defaults: #{Gem.configuration["gem"]}" if Gem.configuration["gem"] && Gem.configuration["gem"] != ""
   end
 
   def get_cert(uri, do_force)
-    http = Net::HTTP.new(uri.host, uri.port)
-    if uri.scheme == 'https'
-      http.use_ssl = true
-    end
+    http = make_http(uri)
     http.start do
       cert_uri = uri.merge("../gem-public_cert.pem")
       http.request_get(cert_uri.path) do |res|
